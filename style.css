@@ -1,0 +1,388 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+}
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 48px;
+  background: #16213e;
+  border-bottom: 1px solid #0f3460;
+  flex-shrink: 0;
+}
+
+.app-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e94560;
+  letter-spacing: 1px;
+  margin-right: 8px;
+}
+
+.btn {
+  padding: 6px 14px;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  background: #0f3460;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn:hover {
+  background: #1a4a8a;
+  border-color: #3a7bd5;
+}
+
+.btn-mode {
+  background: #0f3460;
+  border-color: #e94560;
+}
+
+.btn-mode.active {
+  background: #e94560;
+  border-color: #e94560;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── Provider bar ── */
+.provider-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.provider-label {
+  font-size: 12px;
+  color: #8899aa;
+  white-space: nowrap;
+}
+
+.provider-select {
+  background: #0f3460;
+  border: 1px solid #3a7bd5;
+  color: #e0e0e0;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.provider-select:focus {
+  outline: none;
+  border-color: #7ab0d4;
+}
+
+.api-key-input {
+  background: #0a1a30;
+  border: 1px solid #3a7bd5;
+  color: #e0e0e0;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  width: 220px;
+  font-family: monospace;
+}
+
+.api-key-input:focus {
+  outline: none;
+  border-color: #7ab0d4;
+}
+
+.api-key-input::placeholder {
+  color: #445566;
+}
+
+.btn-apply {
+  background: #3a7bd5;
+  border-color: #3a7bd5;
+  font-weight: 600;
+}
+
+.btn-apply:hover {
+  background: #4a8be5;
+}
+
+/* ── Main layout ── */
+.main {
+  display: flex;
+  height: calc(100vh - 48px);
+}
+
+#map {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Crosshair cursor when in add mode */
+#map.add-mode {
+  cursor: crosshair !important;
+}
+
+#map.add-mode .leaflet-interactive {
+  cursor: pointer !important;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+  width: 360px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #16213e;
+  border-left: 1px solid #0f3460;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #0f3460;
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+.point-count {
+  background: #e94560;
+  color: #fff;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.table-wrapper {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.table-wrapper::-webkit-scrollbar {
+  width: 6px;
+}
+.table-wrapper::-webkit-scrollbar-track {
+  background: #16213e;
+}
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: #0f3460;
+  border-radius: 3px;
+}
+
+/* ── Points table ── */
+#points-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#points-table thead th {
+  position: sticky;
+  top: 0;
+  background: #1a2a50;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #8899aa;
+  border-bottom: 1px solid #0f3460;
+}
+
+#points-table tbody tr {
+  border-bottom: 1px solid #0f3460;
+  transition: background 0.1s;
+  cursor: pointer;
+}
+
+#points-table tbody tr:hover {
+  background: #1a3a6e;
+}
+
+#points-table td {
+  padding: 7px 10px;
+  vertical-align: middle;
+}
+
+#points-table td:first-child {
+  color: #8899aa;
+  font-size: 12px;
+  width: 28px;
+}
+
+/* Description cell — inline editable */
+.desc-cell {
+  min-width: 80px;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+  border-radius: 3px;
+  padding: 2px 4px;
+}
+
+.desc-cell:focus {
+  background: #0f3460;
+  white-space: normal;
+  overflow: visible;
+  box-shadow: 0 0 0 2px #3a7bd5;
+}
+
+.coord-cell {
+  color: #7ab0d4;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  width: 76px;
+}
+
+.btn-delete {
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-delete:hover {
+  color: #e94560;
+  background: rgba(233, 69, 96, 0.1);
+}
+
+/* ── Empty state ── */
+.empty-state {
+  display: none;
+  text-align: center;
+  padding: 40px 20px;
+  color: #445566;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.empty-state.visible {
+  display: block;
+}
+
+/* ── Imagery date overlay ── */
+.imagery-date {
+  position: fixed;
+  bottom: 24px;
+  right: 380px;
+  background: rgba(22, 33, 62, 0.88);
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1000;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+
+.imagery-label {
+  color: #8899aa;
+  white-space: nowrap;
+}
+
+.imagery-date-value {
+  color: #7ab0d4;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.imagery-date-value.loading {
+  color: #556677;
+}
+
+/* ── Toast notification ── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #0f3460;
+  color: #e0e0e0;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  border: 1px solid #3a7bd5;
+  z-index: 9999;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Leaflet popup override ── */
+.leaflet-popup-content-wrapper {
+  background: #16213e;
+  color: #e0e0e0;
+  border: 1px solid #0f3460;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+}
+
+.leaflet-popup-tip {
+  background: #16213e;
+}
+
+.leaflet-popup-content {
+  margin: 10px 14px;
+  font-size: 13px;
+}
+
+.popup-desc {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.popup-coords {
+  color: #7ab0d4;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.popup-delete {
+  background: none;
+  border: 1px solid #e94560;
+  color: #e94560;
+  padding: 3px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  width: 100%;
+}
+
+.popup-delete:hover {
+  background: #e94560;
+  color: #fff;
+}

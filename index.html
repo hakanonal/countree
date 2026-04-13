@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Countree</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="toolbar">
+    <span class="app-title">Countree</span>
+    <button id="btn-mode" class="btn btn-mode active">+ Add Mode</button>
+    <button id="btn-save" class="btn">Save CSV</button>
+    <button id="btn-load" class="btn">Load CSV</button>
+    <input type="file" id="file-input" accept=".csv" style="display:none" />
+
+    <div class="provider-bar">
+      <span class="provider-label">Satellite</span>
+      <select id="provider-select" class="provider-select">
+        <option value="google_unofficial">Google (no key)</option>
+        <option value="esri">ESRI World Imagery (no key)</option>
+        <option value="mapbox">Mapbox</option>
+        <option value="google">Google Maps API</option>
+        <option value="here">HERE Maps</option>
+      </select>
+      <input id="api-key-input" class="api-key-input" type="text" placeholder="Paste API key…" style="display:none" />
+      <button id="api-key-apply" class="btn btn-apply" style="display:none">Apply</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div id="map"></div>
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <span>Points</span>
+        <span id="point-count" class="point-count">0</span>
+      </div>
+      <div class="table-wrapper">
+        <table id="points-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Description</th>
+              <th>Latitude</th>
+              <th>Longitude</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="points-tbody"></tbody>
+        </table>
+        <div id="empty-state" class="empty-state">
+          Click on the map to add a point
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div id="imagery-date" class="imagery-date" style="display:none">
+    <span class="imagery-label">Imagery date</span>
+    <span id="imagery-date-value" class="imagery-date-value">—</span>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

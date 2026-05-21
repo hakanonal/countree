@@ -94,6 +94,8 @@ const map = L.map('map', {
   maxZoom: 23,
 });
 
+const markerCluster = L.markerClusterGroup().addTo(map);
+
 let currentProviderId = null;
 
 function applyProvider(providerId, apiKey) {
@@ -246,7 +248,8 @@ map.on('click', (e) => {
 });
 
 function addPoint({ id, description, lat, lng }) {
-  const marker = L.marker([lat, lng]).addTo(map);
+  const marker = L.marker([lat, lng]);
+  markerCluster.addLayer(marker);
   bindPopup(marker, { id, description, lat, lng });
 
   const point = { id, description, lat, lng, marker };
@@ -278,7 +281,7 @@ function bindPopup(marker, point) {
 function deletePoint(id) {
   const idx = points.findIndex(p => p.id === id);
   if (idx === -1) return;
-  map.removeLayer(points[idx].marker);
+  markerCluster.removeLayer(points[idx].marker);
   points.splice(idx, 1);
   renderTable();
 }
@@ -353,7 +356,8 @@ async function addPointsInChunks(rows) {
   const CHUNK = 150;
   for (let i = 0; i < rows.length; i += CHUNK) {
     rows.slice(i, i + CHUNK).forEach(row => {
-      const marker = L.marker([row.lat, row.lng]).addTo(map);
+      const marker = L.marker([row.lat, row.lng]);
+      markerCluster.addLayer(marker);
       const point = { id: nextId++, description: row.description, lat: row.lat, lng: row.lng, marker };
       bindPopup(marker, point);
       points.push(point);

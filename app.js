@@ -288,16 +288,14 @@ function renderTable() {
   countEl.textContent = points.length;
   emptyEl.classList.toggle('visible', points.length === 0);
 
-  tbody.innerHTML = '';
+  const fragment = document.createDocumentFragment();
   points.forEach((p, i) => {
     const tr = document.createElement('tr');
     tr.dataset.id = p.id;
 
-    // row number
     const tdNum = document.createElement('td');
     tdNum.textContent = i + 1;
 
-    // description — inline editable
     const tdDesc = document.createElement('td');
     const descSpan = document.createElement('span');
     descSpan.className = 'desc-cell';
@@ -308,19 +306,16 @@ function renderTable() {
       const newDesc = descSpan.textContent.trim() || p.description;
       descSpan.textContent = newDesc;
       p.description = newDesc;
-      // refresh popup with new description
       p.marker.closePopup();
       bindPopup(p.marker, p);
     });
     descSpan.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); descSpan.blur(); }
-      e.stopPropagation(); // prevent map shortcuts
+      e.stopPropagation();
     });
-    // stop click-on-cell from triggering row zoom
     descSpan.addEventListener('click', (e) => e.stopPropagation());
     tdDesc.appendChild(descSpan);
 
-    // lat / lng
     const tdLat = document.createElement('td');
     tdLat.className = 'coord-cell';
     tdLat.textContent = p.lat.toFixed(5);
@@ -329,7 +324,6 @@ function renderTable() {
     tdLng.className = 'coord-cell';
     tdLng.textContent = p.lng.toFixed(5);
 
-    // delete button
     const tdDel = document.createElement('td');
     const delBtn = document.createElement('button');
     delBtn.className = 'btn-delete';
@@ -343,14 +337,31 @@ function renderTable() {
 
     tr.append(tdNum, tdDesc, tdLat, tdLng, tdDel);
 
-    // row click → zoom to marker
     tr.addEventListener('click', () => {
       map.setView([p.lat, p.lng], Math.max(map.getZoom(), 14));
       p.marker.openPopup();
     });
 
-    tbody.appendChild(tr);
+    fragment.appendChild(tr);
   });
+  tbody.innerHTML = '';
+  tbody.appendChild(fragment);
+}
+
+// ── Bulk point loader ─────────────────────────────────────────────────────────
+async function addPointsInChunks(rows) {
+  const CHUNK = 150;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    rows.slice(i, i + CHUNK).forEach(row => {
+      const marker = L.marker([row.lat, row.lng]).addTo(map);
+      const point = { id: nextId++, description: row.description, lat: row.lat, lng: row.lng, marker };
+      bindPopup(marker, point);
+      points.push(point);
+    });
+    // yield to browser every chunk so it doesn't freeze
+    await new Promise(r => setTimeout(r, 0));
+  }
+  renderTable();
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
@@ -387,7 +398,7 @@ fileInput.addEventListener('change', () => {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     const text = e.target.result;
     const result = parseCSV(text);
 
@@ -405,9 +416,7 @@ fileInput.addEventListener('change', () => {
     points = [];
     nextId = 1;
 
-    result.rows.forEach(row => {
-      addPoint({ id: nextId++, description: row.description, lat: row.lat, lng: row.lng });
-    });
+    await addPointsInChunks(result.rows);
 
     // fit map to loaded points
     const latlngs = points.map(p => [p.lat, p.lng]);

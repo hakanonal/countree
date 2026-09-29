@@ -60,6 +60,33 @@ html, body {
   font-weight: 600;
 }
 
+/* ── Close-points filter ── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 12px;
+  color: #8899aa;
+}
+
+.filter-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.filter-value {
+  min-width: 42px;
+  color: #e0e0e0;
+}
+
+.filter-bar + .provider-bar {
+  margin-left: 0;
+}
+
 /* ── Provider bar ── */
 .provider-bar {
   display: flex;

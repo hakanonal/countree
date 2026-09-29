@@ -162,6 +162,9 @@ const apiKeyInput     = document.getElementById('api-key-input');
 const apiKeyApply     = document.getElementById('api-key-apply');
 const imageryDateEl   = document.getElementById('imagery-date');
 const imageryDateVal  = document.getElementById('imagery-date-value');
+const dupEnable       = document.getElementById('dup-enable');
+const dupDistance     = document.getElementById('dup-distance');
+const dupDistanceVal  = document.getElementById('dup-distance-value');
 
 // ── Read keys from config.js ──────────────────────────────────────────────────
 const CFG = window.COUNTREE_CONFIG || {};
@@ -286,13 +289,68 @@ function deletePoint(id) {
   renderTable();
 }
 
+// ── Close-points filter ───────────────────────────────────────────────────────
+function distanceMeters(a, b) {
+  const R = 6371000, rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const h = Math.sin(dLat / 2) ** 2 +
+            Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// Points that have at least one other point within `meters`.
+function findClosePoints(meters) {
+  const sorted = [...points].sort((a, b) => a.lat - b.lat);
+  const maxDLat = meters / 111000; // 1° latitude ≈ 111 km
+  const close = new Set();
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length && sorted[j].lat - sorted[i].lat <= maxDLat; j++) {
+      if (distanceMeters(sorted[i], sorted[j]) <= meters) {
+        close.add(sorted[i]);
+        close.add(sorted[j]);
+      }
+    }
+  }
+  return close;
+}
+
+function visiblePoints() {
+  if (!dupEnable.checked) return points;
+  const close = findClosePoints(parseFloat(dupDistance.value));
+  return points.filter(p => close.has(p));
+}
+
+function syncMarkers(visible) {
+  const show = new Set(visible);
+  const toAdd = [], toRemove = [];
+  points.forEach(p => {
+    const shown = markerCluster.hasLayer(p.marker);
+    if (show.has(p) && !shown) toAdd.push(p.marker);
+    else if (!show.has(p) && shown) toRemove.push(p.marker);
+  });
+  markerCluster.removeLayers(toRemove);
+  markerCluster.addLayers(toAdd);
+}
+
+dupEnable.addEventListener('change', () => {
+  dupDistance.disabled = !dupEnable.checked;
+  renderTable();
+});
+dupDistance.addEventListener('input', () => {
+  dupDistanceVal.textContent = `${parseFloat(dupDistance.value).toFixed(1)} m`;
+  if (dupEnable.checked) renderTable();
+});
+
 // ── Render table ──────────────────────────────────────────────────────────────
 function renderTable() {
-  countEl.textContent = points.length;
+  const visible = visiblePoints();
+  syncMarkers(visible);
+  countEl.textContent = dupEnable.checked ? `${visible.length} / ${points.length}` : points.length;
   emptyEl.classList.toggle('visible', points.length === 0);
 
   const fragment = document.createDocumentFragment();
-  points.forEach((p, i) => {
+  visible.forEach((p, i) => {
     const tr = document.createElement('tr');
     tr.dataset.id = p.id;
 

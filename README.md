@@ -12,6 +12,7 @@ A zero-backend, single-page web app for dropping and managing geo-points on a li
 - **CSV export / import** — Save and Load buttons for persisting your session across page reloads
 - **Area groups** — use the Draw Area tool to outline a polygon (click to add corners, click the first corner to close it), then name it. Every point inside becomes a member of that group; a point can belong to several groups and areas may overlap
 - **Edit & highlight groups** — click an area to rename it, reshape it by dragging its corners, or delete it; the Group dropdown highlights one group and shows only its points
+- **Close-points filter** — tick *Close points* in the toolbar and set a distance (0.1–20 m, default 1 m) with the slider; the map and table then show only points that have another point within that distance, which helps spot duplicates. The table count reads `shown / total`
 - **Multiple satellite providers** — switch between Google (no key), ESRI World Imagery (no key), Mapbox, Google Maps API, and HERE Maps from a toolbar dropdown
 - **Imagery date** — when using ESRI, a badge shows the approximate capture date of the imagery at the current map view
 

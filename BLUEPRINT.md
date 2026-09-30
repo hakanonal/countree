@@ -84,6 +84,12 @@ countree/
   group,"North orchard",,,"41.02 28.97;41.02 28.98;41.01 28.98"
   ```
 
+### 9. Close-Points Filter
+- Toolbar checkbox **Close points** plus a range slider (0.1–20 m, step 0.1, default 1 m; disabled until checked) with a live value label
+- `findClosePoints(meters)` returns every point that has at least one other point within the distance: points are sorted by latitude and the inner loop stops once the latitude gap exceeds `meters / 111000`, then `distanceMeters()` (haversine) confirms
+- `visiblePoints()` applies the filter; `renderTable()` uses it to sync map markers (`syncMarkers`, add/remove on the cluster layer) and table rows, and shows the count as `shown / total`
+- Purpose: quickly find duplicate or near-duplicate points; it composes with the group filter
+
 ---
 
 ## Data Model
@@ -138,3 +144,4 @@ groups = [
 | 12 | Area groups — polygon drawing, naming popup, point-in-polygon membership |
 | 13 | Group editing (vertex drag), group filter/highlight, Groups table column |
 | 14 | CSV format extended with `type` column and `group` rows (legacy files still load) |
+| 15 | Close-points filter — distance slider, haversine proximity check, marker/table filtering |

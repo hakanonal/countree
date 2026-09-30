@@ -261,8 +261,16 @@ html, body {
   border-bottom: 1px solid #0f3460;
   transition: background 0.1s;
   cursor: pointer;
-  content-visibility: auto;
-  contain-intrinsic-size: 0 36px;
+  height: 36px;
+}
+
+#points-table tbody tr.spacer {
+  border: none;
+  pointer-events: none;
+}
+
+#points-table tbody tr.spacer td {
+  padding: 0;
 }
 
 #points-table tbody tr:hover {

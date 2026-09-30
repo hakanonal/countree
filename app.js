@@ -271,10 +271,11 @@ function addPoint({ id, description, lat, lng }) {
   markerCluster.addLayer(marker);
   bindPopup(marker, { id, description, lat, lng });
 
-  const point = { id, description, lat, lng, marker };
+  const point = { id, description, lat, lng, marker, shown: true, groups: groups.filter(g => inGroup({ lat, lng }, g)) };
   points.push(point);
 
-  renderTable();
+  if (filtersActive()) renderTable();
+  else { updateCount(); scrollTableToEnd(); }
   return point;
 }
 
@@ -302,7 +303,8 @@ function deletePoint(id) {
   if (idx === -1) return;
   markerCluster.removeLayer(points[idx].marker);
   points.splice(idx, 1);
-  renderTable();
+  if (filtersActive()) renderTable();
+  else { updateCount(); renderRows(true); }
 }
 
 // ── Close-points filter ───────────────────────────────────────────────────────
@@ -334,7 +336,7 @@ function findClosePoints(meters) {
 function visiblePoints() {
   let list = points;
   const sel = groups.find(g => g.id === selectedGroupId);
-  if (sel) list = list.filter(p => inGroup(p, sel));
+  if (sel) list = list.filter(p => p.groups.includes(sel));
   if (dupEnable.checked) {
     const close = findClosePoints(parseFloat(dupDistance.value));
     list = list.filter(p => close.has(p));
@@ -346,9 +348,10 @@ function syncMarkers(visible) {
   const show = new Set(visible);
   const toAdd = [], toRemove = [];
   points.forEach(p => {
-    const shown = markerCluster.hasLayer(p.marker);
-    if (show.has(p) && !shown) toAdd.push(p.marker);
-    else if (!show.has(p) && shown) toRemove.push(p.marker);
+    const want = show.has(p);
+    if (want && !p.shown) toAdd.push(p.marker);
+    else if (!want && p.shown) toRemove.push(p.marker);
+    p.shown = want;
   });
   markerCluster.removeLayers(toRemove);
   markerCluster.addLayers(toAdd);
@@ -558,6 +561,7 @@ function groupsChanged() {
         : { weight: 2, opacity: 0.9, fillOpacity: 0.15 });
     if (on) g.layer.bringToFront();
   });
+  points.forEach(p => { p.groups = groups.filter(g => inGroup(p, g)); });
   renderTable();
 }
 
@@ -594,96 +598,148 @@ document.getElementById('group-modal-close').addEventListener('click', closeGrou
 groupModal.addEventListener('click', (e) => { if (e.target === groupModal) closeGroupModal(); });
 
 // ── Render table ──────────────────────────────────────────────────────────────
+// The table is virtualized: only rows near the viewport exist in the DOM,
+// with spacer rows standing in for the rest so the scrollbar stays accurate.
+const tableWrap = document.querySelector('.table-wrapper');
+const ROW_H = 36, ROW_BUFFER = 10;
+let visible = points;
+let rowRange = [-1, -1];
+
+function filtersActive() {
+  return selectedGroupId !== null || dupEnable.checked;
+}
+
+function updateCount() {
+  countEl.textContent = filtersActive() ? `${visible.length} / ${points.length}` : points.length;
+  emptyEl.classList.toggle('visible', points.length === 0);
+}
+
+// Full refresh: recompute the visible set, sync markers, redraw rows.
 function renderTable() {
-  const visible = visiblePoints();
+  visible = visiblePoints();
   syncMarkers(visible);
   const highlight = selectedGroupId !== null;
   visible.forEach(p => {
     if (!!p.hl !== highlight) { p.hl = highlight; p.marker.setIcon(highlight ? hlIcon : defaultIcon); }
   });
-  const filtered = dupEnable.checked || highlight;
-  countEl.textContent = filtered ? `${visible.length} / ${points.length}` : points.length;
-  emptyEl.classList.toggle('visible', points.length === 0);
+  updateCount();
+  renderRows(true);
+}
+
+function spacerRow(rows) {
+  const tr = document.createElement('tr');
+  tr.className = 'spacer';
+  const td = document.createElement('td');
+  td.colSpan = 6;
+  td.style.height = `${rows * ROW_H}px`;
+  tr.appendChild(td);
+  return tr;
+}
+
+function renderRows(force) {
+  const start = Math.max(0, Math.floor(tableWrap.scrollTop / ROW_H) - ROW_BUFFER);
+  const end   = Math.min(visible.length, Math.ceil((tableWrap.scrollTop + tableWrap.clientHeight) / ROW_H) + ROW_BUFFER);
+  if (!force && start === rowRange[0] && end === rowRange[1]) return;
+  rowRange = [start, end];
 
   const fragment = document.createDocumentFragment();
-  visible.forEach((p, i) => {
-    const tr = document.createElement('tr');
-    tr.dataset.id = p.id;
-
-    const tdNum = document.createElement('td');
-    tdNum.textContent = i + 1;
-
-    const tdDesc = document.createElement('td');
-    const descSpan = document.createElement('span');
-    descSpan.className = 'desc-cell';
-    descSpan.contentEditable = 'true';
-    descSpan.textContent = p.description;
-    descSpan.title = 'Click to edit';
-    descSpan.addEventListener('blur', () => {
-      const newDesc = descSpan.textContent.trim() || p.description;
-      descSpan.textContent = newDesc;
-      p.description = newDesc;
-      p.marker.closePopup();
-      bindPopup(p.marker, p);
-    });
-    descSpan.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); descSpan.blur(); }
-      e.stopPropagation();
-    });
-    descSpan.addEventListener('click', (e) => e.stopPropagation());
-    tdDesc.appendChild(descSpan);
-
-    const tdLat = document.createElement('td');
-    tdLat.className = 'coord-cell';
-    tdLat.textContent = p.lat.toFixed(5);
-
-    const tdLng = document.createElement('td');
-    tdLng.className = 'coord-cell';
-    tdLng.textContent = p.lng.toFixed(5);
-
-    const tdDel = document.createElement('td');
-    const delBtn = document.createElement('button');
-    delBtn.className = 'btn-delete';
-    delBtn.textContent = '✕';
-    delBtn.title = 'Delete point';
-    delBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      deletePoint(p.id);
-    });
-    tdDel.appendChild(delBtn);
-
-    const tdGroups = document.createElement('td');
-    tdGroups.className = 'group-cell';
-    tdGroups.textContent = groups.filter(g => inGroup(p, g)).map(g => g.name).join(', ');
-
-    tr.append(tdNum, tdDesc, tdLat, tdLng, tdGroups, tdDel);
-
-    tr.addEventListener('click', () => {
-      map.setView([p.lat, p.lng], Math.max(map.getZoom(), 14));
-      p.marker.openPopup();
-    });
-
-    fragment.appendChild(tr);
-  });
+  fragment.appendChild(spacerRow(start));
+  for (let i = start; i < end; i++) fragment.appendChild(makeRow(visible[i], i));
+  fragment.appendChild(spacerRow(visible.length - end));
   tbody.innerHTML = '';
   tbody.appendChild(fragment);
+}
+
+function scrollTableToEnd() {
+  tableWrap.scrollTop = visible.length * ROW_H;
+  renderRows(true);
+}
+
+let scrollQueued = false;
+tableWrap.addEventListener('scroll', () => {
+  if (scrollQueued) return;
+  scrollQueued = true;
+  requestAnimationFrame(() => {
+    scrollQueued = false;
+    if (!tbody.contains(document.activeElement)) renderRows(false); // don't drop a row being edited
+  });
+});
+
+function makeRow(p, i) {
+  const tr = document.createElement('tr');
+  tr.dataset.id = p.id;
+
+  const tdNum = document.createElement('td');
+  tdNum.textContent = i + 1;
+
+  const tdDesc = document.createElement('td');
+  const descSpan = document.createElement('span');
+  descSpan.className = 'desc-cell';
+  descSpan.contentEditable = 'true';
+  descSpan.textContent = p.description;
+  descSpan.title = 'Click to edit';
+  descSpan.addEventListener('blur', () => {
+    const newDesc = descSpan.textContent.trim() || p.description;
+    descSpan.textContent = newDesc;
+    p.description = newDesc;
+    p.marker.closePopup();
+    bindPopup(p.marker, p);
+  });
+  descSpan.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); descSpan.blur(); }
+    e.stopPropagation();
+  });
+  descSpan.addEventListener('click', (e) => e.stopPropagation());
+  tdDesc.appendChild(descSpan);
+
+  const tdLat = document.createElement('td');
+  tdLat.className = 'coord-cell';
+  tdLat.textContent = p.lat.toFixed(5);
+
+  const tdLng = document.createElement('td');
+  tdLng.className = 'coord-cell';
+  tdLng.textContent = p.lng.toFixed(5);
+
+  const tdDel = document.createElement('td');
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn-delete';
+  delBtn.textContent = '✕';
+  delBtn.title = 'Delete point';
+  delBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    deletePoint(p.id);
+  });
+  tdDel.appendChild(delBtn);
+
+  const tdGroups = document.createElement('td');
+  tdGroups.className = 'group-cell';
+  tdGroups.textContent = p.groups.map(g => g.name).join(', ');
+
+  tr.append(tdNum, tdDesc, tdLat, tdLng, tdGroups, tdDel);
+
+  tr.addEventListener('click', () => {
+    map.setView([p.lat, p.lng], Math.max(map.getZoom(), 14));
+    p.marker.openPopup();
+  });
+
+  return tr;
 }
 
 // ── Bulk point loader ─────────────────────────────────────────────────────────
 async function addPointsInChunks(rows) {
   const CHUNK = 150;
   for (let i = 0; i < rows.length; i += CHUNK) {
-    rows.slice(i, i + CHUNK).forEach(row => {
+    const markers = rows.slice(i, i + CHUNK).map(row => {
       const marker = L.marker([row.lat, row.lng]);
-      markerCluster.addLayer(marker);
-      const point = { id: nextId++, description: row.description, lat: row.lat, lng: row.lng, marker };
+      const point = { id: nextId++, description: row.description, lat: row.lat, lng: row.lng, marker, shown: true, groups: [] };
       bindPopup(marker, point);
       points.push(point);
+      return marker;
     });
+    markerCluster.addLayers(markers);
     // yield to browser every chunk so it doesn't freeze
     await new Promise(r => setTimeout(r, 0));
   }
-  renderTable();
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
@@ -733,7 +789,7 @@ fileInput.addEventListener('change', () => {
     }
 
     // clear existing
-    points.forEach(p => map.removeLayer(p.marker));
+    markerCluster.clearLayers();
     points = [];
     nextId = 1;
     stopEdit();

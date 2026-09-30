@@ -171,6 +171,10 @@ const dupDistance     = document.getElementById('dup-distance');
 const dupDistanceVal  = document.getElementById('dup-distance-value');
 const btnArea         = document.getElementById('btn-area');
 const groupSelect     = document.getElementById('group-select');
+const btnGroupList    = document.getElementById('btn-group-list');
+const groupModal      = document.getElementById('group-modal');
+const groupModalBody  = document.getElementById('group-modal-tbody');
+const groupModalEmpty = document.getElementById('group-modal-empty');
 
 // ── Read keys from config.js ──────────────────────────────────────────────────
 const CFG = window.COUNTREE_CONFIG || {};
@@ -447,10 +451,10 @@ function finishDraft() {
   input.focus();
 }
 
-function addGroup({ id, name, vertices }) {
+function addGroup({ id, name, vertices, description = '' }) {
   const color = GROUP_COLORS[(id - 1) % GROUP_COLORS.length];
   const layer = L.polygon(vertices, { color, className: 'group-poly' }).addTo(map);
-  const g = { id, name, vertices, layer, color, handles: null };
+  const g = { id, name, description, vertices, layer, color, handles: null };
   layer.bindPopup(() => groupPopupContent(g));
   groups.push(g);
   return g;
@@ -562,8 +566,32 @@ groupSelect.addEventListener('change', () => {
 });
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { cancelDraft(); stopEdit(); }
+  if (e.key === 'Escape') { cancelDraft(); stopEdit(); closeGroupModal(); }
 });
+
+// ── Group list modal ──────────────────────────────────────────────────────────
+function openGroupModal() {
+  groupModalBody.innerHTML = '';
+  groups.forEach(g => {
+    const count = points.filter(p => inGroup(p, g)).length;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escHtml(g.name)}</td><td>${count}</td><td><input class="popup-input" /></td>`;
+    const input = tr.querySelector('input');
+    input.value = g.description;
+    input.addEventListener('input', () => { g.description = input.value; });
+    groupModalBody.appendChild(tr);
+  });
+  groupModalEmpty.style.display = groups.length ? 'none' : 'block';
+  groupModal.style.display = 'flex';
+}
+
+function closeGroupModal() {
+  groupModal.style.display = 'none';
+}
+
+btnGroupList.addEventListener('click', openGroupModal);
+document.getElementById('group-modal-close').addEventListener('click', closeGroupModal);
+groupModal.addEventListener('click', (e) => { if (e.target === groupModal) closeGroupModal(); });
 
 // ── Render table ──────────────────────────────────────────────────────────────
 function renderTable() {
@@ -663,9 +691,9 @@ btnSave.addEventListener('click', () => {
   if (points.length === 0 && groups.length === 0) { showToast('Nothing to save.'); return; }
 
   const q = (str) => `"${str.replace(/"/g, '""')}"`;
-  const rows = ['type,description,latitude,longitude,vertices'];
-  points.forEach(p => rows.push(`point,${q(p.description)},${p.lat},${p.lng},`));
-  groups.forEach(g => rows.push(`group,${q(g.name)},,,${q(g.vertices.map(v => v.join(' ')).join(';'))}`));
+  const rows = ['type,description,latitude,longitude,vertices,group_description'];
+  points.forEach(p => rows.push(`point,${q(p.description)},${p.lat},${p.lng},,`));
+  groups.forEach(g => rows.push(`group,${q(g.name)},,,${q(g.vertices.map(v => v.join(' ')).join(';'))},${q(g.description)}`));
 
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
   const url  = URL.createObjectURL(blob);
@@ -750,7 +778,7 @@ function parseCSV(text) {
       if (vertices.length < 3 || vertices.some(v => v.length !== 2 || v.some(isNaN))) {
         return { error: `Invalid area at line ${i + 1}.` };
       }
-      groupRows.push({ name: cols[0], vertices });
+      groupRows.push({ name: cols[0], vertices, description: cols[4] || '' });
       continue;
     }
     if (cols.length < 3) { return { error: `Invalid row at line ${i + 1}.` }; }

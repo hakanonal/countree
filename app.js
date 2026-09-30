@@ -1,7 +1,11 @@
 // ── State ─────────────────────────────────────────────────────────────────────
 let points = [];       // { id, description, lat, lng, marker }
 let nextId = 1;
-let addMode = true;
+let tool = 'add';      // 'add' | 'pan' | 'area'
+let groups = [];       // { id, name, vertices: [[lat, lng], ...], layer, handles }
+let nextGroupId = 1;
+let selectedGroupId = null;
+let draft = null;      // area being drawn: { vertices, line, start }
 let currentTileLayer = null;
 
 // ── Provider configs ──────────────────────────────────────────────────────────
@@ -165,6 +169,8 @@ const imageryDateVal  = document.getElementById('imagery-date-value');
 const dupEnable       = document.getElementById('dup-enable');
 const dupDistance     = document.getElementById('dup-distance');
 const dupDistanceVal  = document.getElementById('dup-distance-value');
+const btnArea         = document.getElementById('btn-area');
+const groupSelect     = document.getElementById('group-select');
 
 // ── Read keys from config.js ──────────────────────────────────────────────────
 const CFG = window.COUNTREE_CONFIG || {};
@@ -219,16 +225,21 @@ providerSelect.addEventListener('change', () => {
 }
 
 // ── Mode toggle ───────────────────────────────────────────────────────────────
-function setAddMode(on) {
-  addMode = on;
-  btnMode.textContent = on ? '+ Add Mode' : '✥ Pan Mode';
-  btnMode.classList.toggle('active', on);
-  mapEl.classList.toggle('add-mode', on);
+function setTool(t) {
+  tool = t;
+  if (t !== 'area') cancelDraft();
+  btnMode.textContent = t === 'add' ? '+ Add Mode' : '✥ Pan Mode';
+  btnMode.classList.toggle('active', t === 'add');
+  btnArea.classList.toggle('active', t === 'area');
+  mapEl.classList.toggle('add-mode', t === 'add');
+  mapEl.classList.toggle('area-mode', t === 'area');
+  mapEl.classList.toggle('pan-mode', t === 'pan');
 }
 
-setAddMode(true);
+setTool('add');
 
-btnMode.addEventListener('click', () => setAddMode(!addMode));
+btnMode.addEventListener('click', () => setTool(tool === 'add' ? 'pan' : 'add'));
+btnArea.addEventListener('click', () => setTool(tool === 'area' ? 'pan' : 'area'));
 
 // ── Auto-description logic ────────────────────────────────────────────────────
 function nextDescription() {
@@ -243,7 +254,8 @@ function nextDescription() {
 
 // ── Add point ─────────────────────────────────────────────────────────────────
 map.on('click', (e) => {
-  if (!addMode) return;
+  if (tool === 'area') { areaClick(e.latlng); return; }
+  if (tool !== 'add') return;
 
   const { lat, lng } = e.latlng;
   const description  = nextDescription();
@@ -316,9 +328,14 @@ function findClosePoints(meters) {
 }
 
 function visiblePoints() {
-  if (!dupEnable.checked) return points;
-  const close = findClosePoints(parseFloat(dupDistance.value));
-  return points.filter(p => close.has(p));
+  let list = points;
+  const sel = groups.find(g => g.id === selectedGroupId);
+  if (sel) list = list.filter(p => inGroup(p, sel));
+  if (dupEnable.checked) {
+    const close = findClosePoints(parseFloat(dupDistance.value));
+    list = list.filter(p => close.has(p));
+  }
+  return list;
 }
 
 function syncMarkers(visible) {
@@ -342,11 +359,222 @@ dupDistance.addEventListener('input', () => {
   if (dupEnable.checked) renderTable();
 });
 
+// ── Areas (groups) ────────────────────────────────────────────────────────────
+const GROUP_COLORS = ['#e94560', '#3a7bd5', '#f5a623', '#50c878', '#b57bee', '#00c2c7'];
+const defaultIcon  = new L.Icon.Default();
+const hlIcon       = L.divIcon({ className: 'marker-hl', iconSize: [20, 20], iconAnchor: [10, 10] });
+const handleIcon   = L.divIcon({ className: 'vertex-handle', iconSize: [12, 12], iconAnchor: [6, 6] });
+
+// Ray casting; x = lng, y = lat
+function pointInPolygon(lat, lng, verts) {
+  let inside = false;
+  for (let i = 0, j = verts.length - 1; i < verts.length; j = i++) {
+    const [latI, lngI] = verts[i], [latJ, lngJ] = verts[j];
+    if ((latI > lat) !== (latJ > lat) &&
+        lng < (lngJ - lngI) * (lat - latI) / (latJ - latI) + lngI) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function inGroup(p, g) {
+  return pointInPolygon(p.lat, p.lng, g.vertices);
+}
+
+// Draw: first click starts, each click adds an edge, clicking the first vertex closes.
+function areaClick(latlng) {
+  if (draft) {
+    draft.vertices.push(latlng);
+    draft.line.setLatLngs(draft.vertices);
+    return;
+  }
+  draft = {
+    vertices: [latlng],
+    line: L.polyline([latlng], { color: '#e94560', dashArray: '6', interactive: false }).addTo(map),
+    start: L.circleMarker(latlng, {
+      radius: 8, color: '#fff', weight: 2, fillColor: '#e94560', fillOpacity: 1,
+      bubblingMouseEvents: false,
+    }).addTo(map),
+  };
+  draft.start.on('click', () => { if (draft.vertices.length >= 3) finishDraft(); });
+}
+
+map.on('mousemove', (e) => {
+  if (draft) draft.line.setLatLngs([...draft.vertices, e.latlng]);
+});
+
+function cancelDraft() {
+  if (!draft) return;
+  map.removeLayer(draft.line);
+  map.removeLayer(draft.start);
+  draft = null;
+}
+
+function finishDraft() {
+  const vertices = draft.vertices.map(v => [v.lat, v.lng]);
+  cancelDraft();
+
+  const preview = L.polygon(vertices, { color: '#e94560', dashArray: '6', interactive: false }).addTo(map);
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <input class="popup-input" placeholder="Group name" />
+    <div class="popup-actions">
+      <button class="popup-btn">Save</button>
+      <button class="popup-delete">Cancel</button>
+    </div>
+  `;
+  const input = div.querySelector('input');
+  const popup = L.popup({ closeOnClick: false, autoClose: false, closeButton: false })
+    .setLatLng(vertices[0])
+    .setContent(div)
+    .openOn(map);
+  popup.on('remove', () => map.removeLayer(preview));
+
+  const save = () => {
+    const name = input.value.trim() || `Group ${nextGroupId}`;
+    addGroup({ id: nextGroupId++, name, vertices });
+    groupsChanged();
+    map.closePopup(popup);
+  };
+  div.querySelector('.popup-btn').addEventListener('click', save);
+  div.querySelector('.popup-delete').addEventListener('click', () => map.closePopup(popup));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') save();
+    if (e.key === 'Escape') map.closePopup(popup);
+    e.stopPropagation();
+  });
+  input.focus();
+}
+
+function addGroup({ id, name, vertices }) {
+  const color = GROUP_COLORS[(id - 1) % GROUP_COLORS.length];
+  const layer = L.polygon(vertices, { color, className: 'group-poly' }).addTo(map);
+  const g = { id, name, vertices, layer, color, handles: null };
+  layer.bindPopup(() => groupPopupContent(g));
+  groups.push(g);
+  return g;
+}
+
+function groupPopupContent(g) {
+  const count = points.filter(p => inGroup(p, g)).length;
+  const selected = selectedGroupId === g.id;
+  const div = document.createElement('div');
+  div.innerHTML = `
+    <input class="popup-input" value="${escHtml(g.name)}" />
+    <div class="popup-coords">${count} point${count !== 1 ? 's' : ''}</div>
+    <div class="popup-actions">
+      <button class="popup-btn" data-act="select">${selected ? 'Show all' : 'Highlight'}</button>
+      <button class="popup-btn" data-act="edit">${g.handles ? 'Done' : 'Edit shape'}</button>
+      <button class="popup-delete" data-act="delete">Delete</button>
+    </div>
+  `;
+  const input = div.querySelector('input');
+  input.addEventListener('change', () => {
+    g.name = input.value.trim() || g.name;
+    groupsChanged();
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') input.blur();
+    e.stopPropagation();
+  });
+  div.querySelector('[data-act="select"]').addEventListener('click', () => {
+    map.closePopup();
+    selectGroup(selected ? null : g.id);
+  });
+  div.querySelector('[data-act="edit"]').addEventListener('click', () => {
+    map.closePopup();
+    if (g.handles) stopEdit(); else startEdit(g);
+  });
+  div.querySelector('[data-act="delete"]').addEventListener('click', () => {
+    map.closePopup();
+    deleteGroup(g.id);
+  });
+  return div;
+}
+
+// Edit shape: drag the vertex handles
+function startEdit(g) {
+  stopEdit();
+  g.handles = g.vertices.map((v, i) =>
+    L.marker(v, { draggable: true, icon: handleIcon })
+      .on('drag', (e) => {
+        const { lat, lng } = e.target.getLatLng();
+        g.vertices[i] = [lat, lng];
+        g.layer.setLatLngs(g.vertices);
+      })
+      .on('dragend', groupsChanged)
+      .addTo(map)
+  );
+}
+
+function stopEdit() {
+  groups.forEach(g => {
+    if (!g.handles) return;
+    g.handles.forEach(h => map.removeLayer(h));
+    g.handles = null;
+  });
+}
+
+function deleteGroup(id) {
+  const idx = groups.findIndex(g => g.id === id);
+  if (idx === -1) return;
+  stopEdit();
+  map.removeLayer(groups[idx].layer);
+  groups.splice(idx, 1);
+  if (selectedGroupId === id) selectedGroupId = null;
+  groupsChanged();
+}
+
+function selectGroup(id) {
+  selectedGroupId = id;
+  groupSelect.value = id === null ? '' : String(id);
+  const g = groups.find(gr => gr.id === id);
+  if (g) map.fitBounds(g.layer.getBounds().pad(0.2));
+  groupsChanged();
+}
+
+// Refresh everything derived from groups: selector, polygon styling, membership
+function groupsChanged() {
+  groupSelect.innerHTML = '<option value="">All groups</option>';
+  groups.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g.id;
+    opt.textContent = g.name;
+    groupSelect.appendChild(opt);
+  });
+  groupSelect.value = selectedGroupId === null ? '' : String(selectedGroupId);
+
+  groups.forEach(g => {
+    const on = g.id === selectedGroupId;
+    g.layer.setStyle(on
+      ? { weight: 4, opacity: 1, fillOpacity: 0.35 }
+      : selectedGroupId !== null
+        ? { weight: 1, opacity: 0.4, fillOpacity: 0.05 }
+        : { weight: 2, opacity: 0.9, fillOpacity: 0.15 });
+    if (on) g.layer.bringToFront();
+  });
+  renderTable();
+}
+
+groupSelect.addEventListener('change', () => {
+  selectGroup(groupSelect.value === '' ? null : parseInt(groupSelect.value, 10));
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { cancelDraft(); stopEdit(); }
+});
+
 // ── Render table ──────────────────────────────────────────────────────────────
 function renderTable() {
   const visible = visiblePoints();
   syncMarkers(visible);
-  countEl.textContent = dupEnable.checked ? `${visible.length} / ${points.length}` : points.length;
+  const highlight = selectedGroupId !== null;
+  visible.forEach(p => {
+    if (!!p.hl !== highlight) { p.hl = highlight; p.marker.setIcon(highlight ? hlIcon : defaultIcon); }
+  });
+  const filtered = dupEnable.checked || highlight;
+  countEl.textContent = filtered ? `${visible.length} / ${points.length}` : points.length;
   emptyEl.classList.toggle('visible', points.length === 0);
 
   const fragment = document.createDocumentFragment();
@@ -396,7 +624,11 @@ function renderTable() {
     });
     tdDel.appendChild(delBtn);
 
-    tr.append(tdNum, tdDesc, tdLat, tdLng, tdDel);
+    const tdGroups = document.createElement('td');
+    tdGroups.className = 'group-cell';
+    tdGroups.textContent = groups.filter(g => inGroup(p, g)).map(g => g.name).join(', ');
+
+    tr.append(tdNum, tdDesc, tdLat, tdLng, tdGroups, tdDel);
 
     tr.addEventListener('click', () => {
       map.setView([p.lat, p.lng], Math.max(map.getZoom(), 14));
@@ -428,13 +660,12 @@ async function addPointsInChunks(rows) {
 
 // ── CSV export ────────────────────────────────────────────────────────────────
 btnSave.addEventListener('click', () => {
-  if (points.length === 0) { showToast('No points to save.'); return; }
+  if (points.length === 0 && groups.length === 0) { showToast('Nothing to save.'); return; }
 
-  const rows = ['description,latitude,longitude'];
-  points.forEach(p => {
-    const desc = `"${p.description.replace(/"/g, '""')}"`;
-    rows.push(`${desc},${p.lat},${p.lng}`);
-  });
+  const q = (str) => `"${str.replace(/"/g, '""')}"`;
+  const rows = ['type,description,latitude,longitude,vertices'];
+  points.forEach(p => rows.push(`point,${q(p.description)},${p.lat},${p.lng},`));
+  groups.forEach(g => rows.push(`group,${q(g.name)},,,${q(g.vertices.map(v => v.join(' ')).join(';'))}`));
 
   const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
   const url  = URL.createObjectURL(blob);
@@ -443,13 +674,13 @@ btnSave.addEventListener('click', () => {
   a.download = 'countree_points.csv';
   a.click();
   URL.revokeObjectURL(url);
-  showToast(`Saved ${points.length} point${points.length !== 1 ? 's' : ''}.`);
+  showToast(`Saved ${points.length} point${points.length !== 1 ? 's' : ''}, ${groups.length} group${groups.length !== 1 ? 's' : ''}.`);
 });
 
 // ── CSV import ────────────────────────────────────────────────────────────────
 btnLoad.addEventListener('click', () => {
-  if (points.length > 0) {
-    if (!confirm('Loading a file will replace all current points. Continue?')) return;
+  if (points.length > 0 || groups.length > 0) {
+    if (!confirm('Loading a file will replace all current points and groups. Continue?')) return;
   }
   fileInput.value = '';
   fileInput.click();
@@ -468,7 +699,7 @@ fileInput.addEventListener('change', () => {
       showToast(`Error: ${result.error}`);
       return;
     }
-    if (result.rows.length === 0) {
+    if (result.rows.length === 0 && result.groups.length === 0) {
       showToast('CSV file contains no points.');
       return;
     }
@@ -477,14 +708,21 @@ fileInput.addEventListener('change', () => {
     points.forEach(p => map.removeLayer(p.marker));
     points = [];
     nextId = 1;
+    stopEdit();
+    groups.forEach(g => map.removeLayer(g.layer));
+    groups = [];
+    nextGroupId = 1;
+    selectedGroupId = null;
 
+    result.groups.forEach(g => addGroup({ id: nextGroupId++, ...g }));
     await addPointsInChunks(result.rows);
+    groupsChanged();
 
-    // fit map to loaded points
-    const latlngs = points.map(p => [p.lat, p.lng]);
+    // fit map to loaded points and areas
+    const latlngs = [...points.map(p => [p.lat, p.lng]), ...groups.flatMap(g => g.vertices)];
     map.fitBounds(L.latLngBounds(latlngs).pad(0.2));
 
-    showToast(`Loaded ${points.length} point${points.length !== 1 ? 's' : ''}.`);
+    showToast(`Loaded ${points.length} point${points.length !== 1 ? 's' : ''}, ${groups.length} group${groups.length !== 1 ? 's' : ''}.`);
   };
   reader.readAsText(file);
 });
@@ -494,16 +732,27 @@ function parseCSV(text) {
   if (lines.length < 2) return { error: 'File is empty or missing header.' };
 
   const header = lines[0].toLowerCase().replace(/\s/g, '');
+  // new format: type,description,latitude,longitude,vertices (legacy: description,latitude,longitude)
+  const typed = header.startsWith('type,');
   if (!header.includes('description') || !header.includes('latitude') || !header.includes('longitude')) {
-    return { error: 'Invalid header. Expected: description,latitude,longitude' };
+    return { error: 'Invalid header. Expected: type,description,latitude,longitude,vertices' };
   }
 
-  const rows = [];
+  const rows = [], groupRows = [];
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
 
     const cols = splitCSVLine(line);
+    const type = typed ? cols.shift().toLowerCase() : 'point';
+    if (type === 'group') {
+      const vertices = (cols[3] || '').split(';').map(v => v.trim().split(/\s+/).map(Number));
+      if (vertices.length < 3 || vertices.some(v => v.length !== 2 || v.some(isNaN))) {
+        return { error: `Invalid area at line ${i + 1}.` };
+      }
+      groupRows.push({ name: cols[0], vertices });
+      continue;
+    }
     if (cols.length < 3) { return { error: `Invalid row at line ${i + 1}.` }; }
 
     const lat = parseFloat(cols[1]);
@@ -512,7 +761,7 @@ function parseCSV(text) {
 
     rows.push({ description: cols[0], lat, lng });
   }
-  return { rows };
+  return { rows, groups: groupRows };
 }
 
 // Handles quoted fields (RFC-4180)

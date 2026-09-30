@@ -166,6 +166,29 @@ html, body {
   cursor: pointer !important;
 }
 
+#map.area-mode {
+  cursor: crosshair !important;
+}
+
+/* Group polygons only take clicks in pan mode, so they never swallow add/draw clicks */
+#map:not(.pan-mode) .group-poly {
+  pointer-events: none !important;
+}
+
+.marker-hl {
+  background: #e94560;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+.vertex-handle {
+  background: #fff;
+  border: 2px solid #e94560;
+  border-radius: 2px;
+  cursor: move;
+}
+
 /* ── Sidebar ── */
 .sidebar {
   width: 360px;
@@ -414,4 +437,47 @@ html, body {
 .popup-delete:hover {
   background: #e94560;
   color: #fff;
+}
+
+.group-cell {
+  color: #8899aa;
+  font-size: 12px;
+}
+
+.popup-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #0a1a30;
+  border: 1px solid #3a7bd5;
+  color: #e0e0e0;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.popup-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.popup-btn {
+  flex: 1;
+  background: #0f3460;
+  border: 1px solid #3a7bd5;
+  color: #e0e0e0;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.popup-btn:hover {
+  background: #1a4a8a;
+}
+
+.popup-actions .popup-delete {
+  flex: 1;
+  width: auto;
 }

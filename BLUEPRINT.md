@@ -50,7 +50,7 @@ countree/
 - Description is editable in a sidebar table row after creation
 
 ### 4. Point Table (Sidebar)
-- Columns: `#` | `Description` | `Latitude` | `Longitude` | `Delete`
+- Columns: `#` | `Description` | `Latitude` | `Longitude` | `Groups` | `Delete`
 - Clicking a row zooms the map to that point
 - Description cells are inline-editable (`contenteditable`)
 
@@ -60,14 +60,29 @@ countree/
 - Clicking the marker on the map also shows a popup with a delete option
 
 ### 5. CSV Export (`Save`)
-- Header: `description,latitude,longitude`
+- Header: `type,description,latitude,longitude,vertices` (point rows followed by group rows, see §8)
 - Triggers `<a download>` pattern — browser downloads `countree_points.csv`
 - No server call
 
 ### 6. CSV Import (`Load`)
 - Hidden `<input type="file" accept=".csv">` triggered by Load button
-- Parses file with `FileReader`, validates header row, loads points
-- Replaces current points (with a confirmation dialog if there are unsaved points)
+- Parses file with `FileReader`, validates header row, loads points and groups; legacy 3-column files (`description,latitude,longitude`) are still accepted
+- Replaces current points and groups (with a confirmation dialog if there are unsaved points)
+
+### 8. Area Groups
+- Tool state is `tool = 'add' | 'pan' | 'area'`; a **Draw Area** toolbar button selects `area`
+- Drawing: first click starts, each further click adds an edge (dashed preview follows the cursor), clicking the first vertex (≥3 vertices) closes the polygon; `Esc` cancels
+- On close a popup asks for the group name (empty → `Group N`)
+- Each area is an independent group; areas may overlap and a point may belong to many groups
+- Membership is **derived**, never stored: `inGroup(point, group)` runs a ray-casting point-in-polygon test, so points added, loaded or areas reshaped later update automatically
+- Clicking a polygon (Pan mode) opens a popup: rename, Highlight, Edit shape (drag vertex handles), Delete. Polygons ignore pointer events in Add/Draw modes so they never swallow clicks
+- Toolbar **Group** dropdown selects a group: its polygon is emphasised, other polygons dimmed, and `visiblePoints()` limits map markers and table rows to its members (member markers use a highlight icon); it composes with the close-points filter
+- CSV: one file with mixed rows, `type` = `point` or `group`. Group rows store the name in `description` and `vertices` as `lat lng` pairs joined by `;`:
+  ```
+  type,description,latitude,longitude,vertices
+  point,"Tree 1",41.01234,28.97654,
+  group,"North orchard",,,"41.02 28.97;41.02 28.98;41.01 28.98"
+  ```
 
 ---
 
@@ -79,6 +94,12 @@ points = [
   { id: 1, description: "Tree 1", lat: 41.015, lng: 28.979 },
   ...
 ]
+
+// Areas; membership is computed from vertices, not stored on points
+groups = [
+  { id: 1, name: "North orchard", vertices: [[41.02, 28.97], [41.02, 28.98], [41.01, 28.98]] },
+  ...
+]
 ```
 
 ---
@@ -87,7 +108,7 @@ points = [
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  [Countree]   [+ Add Mode ▼]   [Save CSV]  [Load CSV]   │  ← top bar
+│  [Countree]  [+ Add Mode] [▱ Draw Area] [Save] [Load]  [Group ▼] │  ← top bar
 ├──────────────────────────────┬──────────────────────────┤
 │                              │  # │ Description │ Lat   │
 │         LEAFLET MAP          │  1 │ Tree 1      │ 41.0  │
@@ -114,3 +135,6 @@ points = [
 | 9 | CSV import (Load button + FileReader) |
 | 10 | Pan/Add mode toggle + cursor indicator |
 | 11 | Edge cases: empty import, malformed CSV warning |
+| 12 | Area groups — polygon drawing, naming popup, point-in-polygon membership |
+| 13 | Group editing (vertex drag), group filter/highlight, Groups table column |
+| 14 | CSV format extended with `type` column and `group` rows (legacy files still load) |

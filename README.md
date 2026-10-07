@@ -2,6 +2,12 @@
 
 A zero-backend, single-page web app for dropping and managing geo-points on a live satellite map. Open `index.html` in a browser — no install, no server, no build step.
 
+## Live Demo
+
+**▶ [https://hakanonal.github.io/countree/](https://hakanonal.github.io/countree/)**
+
+The latest version of the app is deployed automatically to GitHub Pages, so you can use Countree straight from your browser without downloading anything. Drop points on the satellite map, draw areas, and use **Load CSV** / **Save CSV** to bring your own data in and out. Nothing is uploaded: everything runs locally in your browser, and unsaved work is lost on reload, so save a CSV before closing the tab. The hosted version has no `config.js`, so only the providers that need no key (Google and ESRI) work there; to use Mapbox, Google Maps API or HERE, run the app locally with your own keys (see [Getting Started](#getting-started)).
+
 ## Features
 
 - **Click to drop pins** — map is always in Add Mode; every click places a named marker

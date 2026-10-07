@@ -16,6 +16,10 @@ A zero-backend, single-page web app for dropping and managing geo-points on a li
 - **Multiple satellite providers** — switch between Google (no key), ESRI World Imagery (no key), Mapbox, Google Maps API, and HERE Maps from a toolbar dropdown
 - **Imagery date** — when using ESRI, a badge shows the approximate capture date of the imagery at the current map view
 
+## User Manual
+
+A full illustrated guide is available in [English](docs/manual.en.md) and [Türkçe](docs/manual.tr.md). The app toolbar also links to it (**Help → EN / TR**).
+
 ## Getting Started
 
 ```bash
@@ -47,6 +51,7 @@ countree/
 ├── index.html          # App shell — loads Leaflet from CDN, wires DOM
 ├── app.js              # All logic: map init, point CRUD, area groups, CSV I/O
 ├── style.css           # Layout and UI
+├── docs/               # User manual (manual.en.md, manual.tr.md) and screenshots
 ├── config.example.js   # API key template (safe to commit)
 └── config.js           # Your actual keys (gitignored)
 ```

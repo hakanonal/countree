@@ -574,3 +574,24 @@ html, body {
 .modal-table .popup-input {
   margin-bottom: 0;
 }
+
+/* ── Help links ── */
+.help-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help-links a {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e0e0e0;
+  text-decoration: none;
+  padding: 3px 8px;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+}
+
+.help-links a:hover {
+  background: #0f3460;
+}

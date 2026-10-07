@@ -574,12 +574,24 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ── Group list modal ──────────────────────────────────────────────────────────
+// Polygon area in m², via local equirectangular projection + shoelace
+function polygonAreaM2(vertices) {
+  const R = 6371000, rad = Math.PI / 180;
+  const lat0 = vertices.reduce((s, v) => s + v[0], 0) / vertices.length;
+  const xy = vertices.map(([lat, lng]) => [R * lng * rad * Math.cos(lat0 * rad), R * lat * rad]);
+  let sum = 0;
+  xy.forEach((p, i) => { const q = xy[(i + 1) % xy.length]; sum += p[0] * q[1] - q[0] * p[1]; });
+  return Math.abs(sum) / 2;
+}
+
 function openGroupModal() {
   groupModalBody.innerHTML = '';
   groups.forEach(g => {
     const count = points.filter(p => inGroup(p, g)).length;
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${escHtml(g.name)}</td><td>${count}</td><td><input class="popup-input" /></td>`;
+    const donum = polygonAreaM2(g.vertices) / 1000;
+    const density = donum > 0 ? (count / donum).toFixed(1) : '–';
+    tr.innerHTML = `<td>${escHtml(g.name)}</td><td>${count}</td><td>${donum.toFixed(2)}</td><td>${density}</td><td><input class="popup-input" /></td>`;
     const input = tr.querySelector('input');
     input.value = g.description;
     input.addEventListener('input', () => { g.description = input.value; });

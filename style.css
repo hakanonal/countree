@@ -175,6 +175,32 @@ html, body {
   pointer-events: none !important;
 }
 
+.group-stats {
+  width: max-content;
+  transform: translate(-50%, -50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(15, 20, 40, 0.85);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.group-stats-name {
+  font-weight: bold;
+  margin-bottom: 2px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.stats-tip {
+  text-align: center;
+  line-height: 1.4;
+}
+
 .marker-hl {
   background: #e94560;
   border: 3px solid #fff;

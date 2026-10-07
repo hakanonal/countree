@@ -169,6 +169,7 @@ const imageryDateVal  = document.getElementById('imagery-date-value');
 const dupEnable       = document.getElementById('dup-enable');
 const dupDistance     = document.getElementById('dup-distance');
 const dupDistanceVal  = document.getElementById('dup-distance-value');
+const statsEnable     = document.getElementById('stats-enable');
 const btnArea         = document.getElementById('btn-area');
 const groupSelect     = document.getElementById('group-select');
 const btnGroupList    = document.getElementById('btn-group-list');
@@ -584,6 +585,63 @@ function polygonAreaM2(vertices) {
   return Math.abs(sum) / 2;
 }
 
+// ── Stats view ────────────────────────────────────────────────────────────────
+// Stats view swaps the point markers for one label per group (trees, dönüm, trees/dönüm).
+// Hovering a marker cluster (a sub-group of points) shows the same numbers for its points.
+function statsHtml(count, donum) {
+  const density = donum > 0 ? (count / donum).toFixed(1) : '–';
+  return `<b>${count}</b> tree${count !== 1 ? 's' : ''}<br>${donum.toFixed(2)} dönüm<br>${density} trees/dönüm`;
+}
+
+let statsLabels = [];
+
+function refreshStats() {
+  statsLabels.forEach(l => map.removeLayer(l));
+  statsLabels = [];
+  if (!statsEnable.checked) return;
+
+  const counts = new Map();
+  points.forEach(p => p.groups.forEach(g => counts.set(g, (counts.get(g) || 0) + 1)));
+  groups.forEach(g => {
+    const html = `<div class="group-stats-name">${escHtml(g.name)}</div>` +
+      statsHtml(counts.get(g) || 0, polygonAreaM2(g.vertices) / 1000);
+    statsLabels.push(L.marker(g.layer.getBounds().getCenter(), {
+      interactive: false,
+      icon: L.divIcon({ className: 'group-stats', html, iconSize: null }),
+    }).addTo(map));
+  });
+}
+
+statsEnable.addEventListener('change', () => {
+  if (statsEnable.checked) map.removeLayer(markerCluster);
+  else markerCluster.addTo(map);
+  refreshStats();
+});
+
+// Convex hull (monotone chain) of [lat, lng] pairs
+function convexHull(pts) {
+  const s = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const build = (arr) => {
+    const h = [];
+    arr.forEach(p => {
+      while (h.length >= 2 && cross(h[h.length - 2], h[h.length - 1], p) <= 0) h.pop();
+      h.push(p);
+    });
+    h.pop();
+    return h;
+  };
+  return build(s).concat(build(s.reverse()));
+}
+
+// A cluster's area is the convex hull of its points
+markerCluster.on('clustermouseover', (e) => {
+  const latlngs = e.layer.getAllChildMarkers().map(m => m.getLatLng());
+  const hull = convexHull(latlngs.map(ll => [ll.lat, ll.lng]));
+  const donum = hull.length >= 3 ? polygonAreaM2(hull) / 1000 : 0;
+  e.layer.unbindTooltip().bindTooltip(statsHtml(latlngs.length, donum), { direction: 'top', className: 'stats-tip' }).openTooltip();
+});
+
 function openGroupModal() {
   groupModalBody.innerHTML = '';
   groups.forEach(g => {
@@ -622,6 +680,7 @@ function filtersActive() {
 }
 
 function updateCount() {
+  refreshStats();
   countEl.textContent = filtersActive() ? `${visible.length} / ${points.length}` : points.length;
   emptyEl.classList.toggle('visible', points.length === 0);
 }

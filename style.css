@@ -545,6 +545,11 @@ html, body {
   font-weight: 600;
 }
 
+.modal-header .btn {
+  margin-left: auto;
+  margin-right: 12px;
+}
+
 .modal-close {
   background: none;
   border: none;

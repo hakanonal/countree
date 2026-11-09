@@ -368,7 +368,17 @@ dupDistance.addEventListener('input', () => {
 });
 
 // ── Areas (groups) ────────────────────────────────────────────────────────────
-const GROUP_COLORS = ['#e94560', '#3a7bd5', '#f5a623', '#50c878', '#b57bee', '#00c2c7'];
+// Groups sharing the same key (group name; exact match) get the same color.
+// Each new key takes the next hue, spaced by the golden angle so colors stay distinct.
+const keyHues = new Map();
+function groupColor(key) {
+  if (!keyHues.has(key)) keyHues.set(key, (keyHues.size * 137.508) % 360);
+  return `hsl(${keyHues.get(key).toFixed(0)}, 70%, 50%)`;
+}
+function recolorGroup(g) {
+  g.color = groupColor(g.name);
+  g.layer.setStyle({ color: g.color });
+}
 const defaultIcon  = new L.Icon.Default();
 const hlIcon       = L.divIcon({ className: 'marker-hl', iconSize: [20, 20], iconAnchor: [10, 10] });
 const handleIcon   = L.divIcon({ className: 'vertex-handle', iconSize: [12, 12], iconAnchor: [6, 6] });
@@ -456,7 +466,7 @@ function finishDraft() {
 }
 
 function addGroup({ id, name, vertices, description = '' }) {
-  const color = GROUP_COLORS[(id - 1) % GROUP_COLORS.length];
+  const color = groupColor(name);
   const layer = L.polygon(vertices, { color, className: 'group-poly' }).addTo(map);
   const g = { id, name, description, vertices, layer, color, handles: null };
   layer.bindPopup(() => groupPopupContent(g));
@@ -480,6 +490,7 @@ function groupPopupContent(g) {
   const input = div.querySelector('input');
   input.addEventListener('change', () => {
     g.name = input.value.trim() || g.name;
+    recolorGroup(g);
     groupsChanged();
   });
   input.addEventListener('keydown', (e) => {
@@ -642,19 +653,43 @@ markerCluster.on('clustermouseover', (e) => {
   e.layer.unbindTooltip().bindTooltip(statsHtml(latlngs.length, donum), { direction: 'top', className: 'stats-tip' }).openTooltip();
 });
 
+let groupModalTotals = false;
+
 function openGroupModal() {
+  const dens = (count, donum) => donum > 0 ? (count / donum).toFixed(1) : '–';
   groupModalBody.innerHTML = '';
-  groups.forEach(g => {
-    const count = points.filter(p => inGroup(p, g)).length;
-    const tr = document.createElement('tr');
-    const donum = polygonAreaM2(g.vertices) / 1000;
-    const density = donum > 0 ? (count / donum).toFixed(1) : '–';
-    tr.innerHTML = `<td>${escHtml(g.name)}</td><td>${count}</td><td>${donum.toFixed(2)}</td><td>${density}</td><td><input class="popup-input" /></td>`;
-    const input = tr.querySelector('input');
-    input.value = g.description;
-    input.addEventListener('input', () => { g.description = input.value; });
-    groupModalBody.appendChild(tr);
-  });
+  document.getElementById('group-modal-title').textContent = groupModalTotals ? 'Totals by group name' : 'Groups';
+  document.getElementById('group-modal-toggle').textContent = groupModalTotals ? '← Groups' : 'Σ Totals by name';
+  document.getElementById('group-modal-thead').innerHTML = groupModalTotals
+    ? '<tr><th>Name</th><th>Groups</th><th>Points</th><th>Area (dönüm)</th><th>Trees/dönüm</th></tr>'
+    : '<tr><th>Name</th><th>Points</th><th>Area (dönüm)</th><th>Trees/dönüm</th><th>Description</th></tr>';
+
+  if (groupModalTotals) {
+    const byName = new Map();
+    groups.forEach(g => {
+      const t = byName.get(g.name) || { n: 0, count: 0, donum: 0 };
+      t.n++;
+      t.count += points.filter(p => inGroup(p, g)).length;
+      t.donum += polygonAreaM2(g.vertices) / 1000;
+      byName.set(g.name, t);
+    });
+    byName.forEach((t, name) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escHtml(name)}</td><td>${t.n}</td><td>${t.count}</td><td>${t.donum.toFixed(2)}</td><td>${dens(t.count, t.donum)}</td>`;
+      groupModalBody.appendChild(tr);
+    });
+  } else {
+    groups.forEach(g => {
+      const count = points.filter(p => inGroup(p, g)).length;
+      const tr = document.createElement('tr');
+      const donum = polygonAreaM2(g.vertices) / 1000;
+      tr.innerHTML = `<td>${escHtml(g.name)}</td><td>${count}</td><td>${donum.toFixed(2)}</td><td>${dens(count, donum)}</td><td><input class="popup-input" /></td>`;
+      const input = tr.querySelector('input');
+      input.value = g.description;
+      input.addEventListener('input', () => { g.description = input.value; });
+      groupModalBody.appendChild(tr);
+    });
+  }
   groupModalEmpty.style.display = groups.length ? 'none' : 'block';
   groupModal.style.display = 'flex';
 }
@@ -663,7 +698,8 @@ function closeGroupModal() {
   groupModal.style.display = 'none';
 }
 
-btnGroupList.addEventListener('click', openGroupModal);
+btnGroupList.addEventListener('click', () => { groupModalTotals = false; openGroupModal(); });
+document.getElementById('group-modal-toggle').addEventListener('click', () => { groupModalTotals = !groupModalTotals; openGroupModal(); });
 document.getElementById('group-modal-close').addEventListener('click', closeGroupModal);
 groupModal.addEventListener('click', (e) => { if (e.target === groupModal) closeGroupModal(); });
 

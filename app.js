@@ -654,6 +654,7 @@ markerCluster.on('clustermouseover', (e) => {
 });
 
 let groupModalTotals = false;
+const swatch = (name) => `<span class="group-swatch" style="background:${groupColor(name)}"></span>`;
 
 function openGroupModal() {
   const dens = (count, donum) => donum > 0 ? (count / donum).toFixed(1) : '–';
@@ -675,7 +676,7 @@ function openGroupModal() {
     });
     byName.forEach((t, name) => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escHtml(name)}</td><td>${t.n}</td><td>${t.count}</td><td>${t.donum.toFixed(2)}</td><td>${dens(t.count, t.donum)}</td>`;
+      tr.innerHTML = `<td>${swatch(name)}${escHtml(name)}</td><td>${t.n}</td><td>${t.count}</td><td>${t.donum.toFixed(2)}</td><td>${dens(t.count, t.donum)}</td>`;
       groupModalBody.appendChild(tr);
     });
   } else {
@@ -683,7 +684,7 @@ function openGroupModal() {
       const count = points.filter(p => inGroup(p, g)).length;
       const tr = document.createElement('tr');
       const donum = polygonAreaM2(g.vertices) / 1000;
-      tr.innerHTML = `<td>${escHtml(g.name)}</td><td>${count}</td><td>${donum.toFixed(2)}</td><td>${dens(count, donum)}</td><td><input class="popup-input" /></td>`;
+      tr.innerHTML = `<td>${swatch(g.name)}${escHtml(g.name)}</td><td>${count}</td><td>${donum.toFixed(2)}</td><td>${dens(count, donum)}</td><td><input class="popup-input" /></td>`;
       const input = tr.querySelector('input');
       input.value = g.description;
       input.addEventListener('input', () => { g.description = input.value; });

@@ -600,3 +600,12 @@ html, body {
 .help-links a:hover {
   background: #0f3460;
 }
+
+.group-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border-radius: 2px;
+  vertical-align: middle;
+}

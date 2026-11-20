@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Countree</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css"/>
@@ -12,10 +12,18 @@
 <body>
   <header class="toolbar">
     <span class="app-title">Countree</span>
-    <button id="btn-mode" class="btn btn-mode">✥ Pan Mode</button>
-    <button id="btn-area" class="btn btn-mode" title="Click points to outline an area; click the first point to close it">▱ Draw Area</button>
-    <button id="btn-save" class="btn">Save CSV</button>
-    <button id="btn-load" class="btn">Load CSV</button>
+    <button id="btn-mode" class="btn btn-mode btn-icon" title="Toggle Pan / Add mode" aria-label="Toggle Pan / Add mode"><span class="ico">✥</span><span class="lbl"> Pan Mode</span></button>
+    <button id="btn-area" class="btn btn-mode btn-icon" title="Tap points to outline an area; tap the first point (or Finish) to close it" aria-label="Draw area"><span class="ico">▱</span><span class="lbl"> Draw Area</span></button>
+    <button id="btn-locate" class="btn btn-icon" title="Show my location on the map (tap again to stop)" aria-label="My location"><span class="ico">◎</span><span class="lbl"> Locate</span></button>
+    <button id="btn-here" class="btn btn-icon" title="Add a point at my current GPS location" aria-label="Add point here"><span class="ico">⊕</span><span class="lbl"> Add here</span></button>
+    <button id="btn-list" class="btn btn-icon btn-list" title="Show the points list" aria-label="Points list">☰ <span id="list-count">0</span></button>
+    <button id="btn-menu" class="btn btn-icon btn-menu" title="More options" aria-label="More options" aria-expanded="false">⋮</button>
+
+    <div id="toolbar-menu" class="toolbar-menu">
+    <div class="file-actions">
+      <button id="btn-save" class="btn">Save CSV</button>
+      <button id="btn-load" class="btn">Load CSV</button>
+    </div>
     <input type="file" id="file-input" accept=".csv" style="display:none" />
 
     <div class="filter-bar">
@@ -48,6 +56,7 @@
       <span class="provider-label">Help</span>
       <a href="https://github.com/hakanonal/countree/blob/main/docs/manual.en.md" target="_blank" rel="noopener" title="User manual (English)">EN</a>
       <a href="https://github.com/hakanonal/countree/blob/main/docs/manual.tr.md" target="_blank" rel="noopener" title="Kullanım kılavuzu (Türkçe)">TR</a>
+    </div>
     </div>
   </header>
 
@@ -82,6 +91,15 @@
   <div id="imagery-date" class="imagery-date" style="display:none">
     <span class="imagery-label">Imagery date</span>
     <span id="imagery-date-value" class="imagery-date-value">—</span>
+  </div>
+
+  <div id="draw-bar" class="map-bar" style="display:none">
+    <button id="draw-undo" class="btn">↶ Undo</button>
+    <button id="draw-finish" class="btn btn-apply" disabled>✓ Finish</button>
+    <button id="draw-cancel" class="btn">✕ Cancel</button>
+  </div>
+  <div id="edit-bar" class="map-bar" style="display:none">
+    <button id="edit-done" class="btn btn-apply">✓ Done editing</button>
   </div>
 
   <div id="group-modal" class="modal-overlay" style="display:none">

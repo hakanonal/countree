@@ -76,6 +76,20 @@ Pencere üç bölümden oluşur: üstte **araç çubuğu**, solda **harita**, sa
 
 Sağdaki tablo her noktayı numarası, açıklaması, enlemi, boylamı ve ait olduğu gruplarla listeler. **POINTS** yanındaki sayı toplam nokta sayısıdır (filtre açıkken `gösterilen / toplam`). Tablo sanallaştırılmıştır; on binlerce satır olsa bile akıcı kayar.
 
+### Telefon ve tabletler
+
+Aynı sayfa küçük ekranlara uyum sağlar:
+
+- **⋮ menüsü** — CSV kaydet/yükle, grup filtresi, yakın nokta kaydırıcısı, uydu sağlayıcısı ve yardım bağlantıları bu menüye taşınır. Geniş ekranlarda araç çubuğunda kalırlar.
+- **☰ liste** — nokta listesi tam ekran bir panel olarak açılır (yanındaki sayı nokta sayınızdır). Bir satıra dokunmak listeyi kapatır ve o noktayı haritada gösterir.
+- **Dokunmatikte yeniden adlandırma** — listede satır içi düzenleme yoktur; noktanın işaretçisine dokunup adı balonda düzenleyin.
+- **Üzerine gelme yerine dokunma** — bir parsele dokunmak aynı ada sahip tüm parselleri vurgular (balon açık kaldığı sürece); bir nokta kümesine dokunmak ağaç sayısını ve alanı mesaj olarak gösterir.
+- **Alan çizme** — çizim sırasında **Geri al**, **Bitir** ve **İptal** düğmeleri görünür; Esc tuşuna veya ilk köşeye tam isabet ettirmeye gerek kalmaz. **Şekli düzenle** bir **Düzenlemeyi bitir** düğmesi gösterir ve köşe tutamaçları daha büyüktür.
+- **◎ Konumum** — canlı GPS konumunuzu ve doğruluğunu haritada gösterir; durdurmak için tekrar dokunun.
+- **⊕ Buraya ekle** — mevcut GPS konumunuza nokta ekler ve doğruluğu bildirir (ör. ±4 m). Eklemeden önce iyi bir doğruluk bekleyin.
+
+Tarayıcılar konum erişimine yalnızca `https://` sayfalarında veya `localhost` üzerinde izin verir; telefonda kullanırken uygulamayı HTTPS ile sunun.
+
 ## 3. Nokta ekleme ve yönetme
 
 ### Nokta ekleme

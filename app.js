@@ -7,6 +7,8 @@ let nextGroupId = 1;
 let selectedGroupId = null;
 let draft = null;      // area being drawn: { vertices, line, start }
 let currentTileLayer = null;
+// Touch-first device (no hover): hover-driven features switch to tap
+const touchUI = window.matchMedia('(hover: none)').matches;
 
 // ── Provider configs ──────────────────────────────────────────────────────────
 const PROVIDERS = {
@@ -177,6 +179,15 @@ const btnGroupList    = document.getElementById('btn-group-list');
 const groupModal      = document.getElementById('group-modal');
 const groupModalBody  = document.getElementById('group-modal-tbody');
 const groupModalEmpty = document.getElementById('group-modal-empty');
+const toolbarEl       = document.querySelector('.toolbar');
+const btnMenu         = document.getElementById('btn-menu');
+const btnList         = document.getElementById('btn-list');
+const listCountEl     = document.getElementById('list-count');
+const btnLocate       = document.getElementById('btn-locate');
+const btnHere         = document.getElementById('btn-here');
+const drawBar         = document.getElementById('draw-bar');
+const drawFinish      = document.getElementById('draw-finish');
+const editBar         = document.getElementById('edit-bar');
 
 // ── Read keys from config.js ──────────────────────────────────────────────────
 const CFG = window.COUNTREE_CONFIG || {};
@@ -234,18 +245,108 @@ providerSelect.addEventListener('change', () => {
 function setTool(t) {
   tool = t;
   if (t !== 'area') cancelDraft();
-  btnMode.textContent = t === 'add' ? '+ Add Mode' : '✥ Pan Mode';
+  btnMode.innerHTML = t === 'add'
+    ? '<span class="ico">+</span><span class="lbl"> Add Mode</span>'
+    : '<span class="ico">✥</span><span class="lbl"> Pan Mode</span>';
   btnMode.classList.toggle('active', t === 'add');
   btnArea.classList.toggle('active', t === 'area');
   mapEl.classList.toggle('add-mode', t === 'add');
   mapEl.classList.toggle('area-mode', t === 'area');
   mapEl.classList.toggle('pan-mode', t === 'pan');
+  updateDrawBar();
 }
 
 setTool('pan');
 
 btnMode.addEventListener('click', () => setTool(tool === 'add' ? 'pan' : 'add'));
 btnArea.addEventListener('click', () => setTool(tool === 'area' ? 'pan' : 'area'));
+
+// ── Compact toolbar: menu + full-screen points list ───────────────────────────
+function setMenuOpen(open) {
+  toolbarEl.classList.toggle('menu-open', open);
+  btnMenu.setAttribute('aria-expanded', String(open));
+}
+
+function setListOpen(open) {
+  document.body.classList.toggle('list-open', open);
+  btnList.classList.toggle('active', open);
+  if (open) { setMenuOpen(false); renderRows(true); } // the list was hidden, so it had no height
+}
+
+btnMenu.addEventListener('click', () => setMenuOpen(!toolbarEl.classList.contains('menu-open')));
+btnList.addEventListener('click', () => setListOpen(!document.body.classList.contains('list-open')));
+document.addEventListener('click', (e) => {
+  if (!toolbarEl.contains(e.target)) setMenuOpen(false);
+});
+window.matchMedia('(max-width: 800px)').addEventListener('change', (e) => { if (!e.matches) setListOpen(false); });
+window.matchMedia('(max-width: 1560px)').addEventListener('change', (e) => { if (!e.matches) setMenuOpen(false); });
+
+// ── GPS (field use) ───────────────────────────────────────────────────────────
+let locWatchId = null;
+let lastFix = null;       // { latlng, accuracy }
+let locDot = null, locCircle = null;
+
+function showFix(pos) {
+  const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+  lastFix = { latlng, accuracy: pos.coords.accuracy };
+  if (!locDot) {
+    locDot = L.marker(latlng, { interactive: false, keyboard: false, icon: L.divIcon({ className: 'loc-dot', iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(map);
+    locCircle = L.circle(latlng, { radius: pos.coords.accuracy, interactive: false, color: '#3a7bd5', weight: 1, fillOpacity: 0.1 }).addTo(map);
+  } else {
+    locDot.setLatLng(latlng);
+    locCircle.setLatLng(latlng).setRadius(pos.coords.accuracy);
+  }
+}
+
+function clearFix() {
+  [locDot, locCircle].forEach(l => l && map.removeLayer(l));
+  locDot = locCircle = lastFix = null;
+}
+
+function geoError(err) {
+  showToast(err.code === 1 ? 'Location permission denied.'
+    : window.isSecureContext ? 'Could not get your location.'
+    : 'Location needs HTTPS (or localhost).');
+}
+
+btnLocate.addEventListener('click', () => {
+  if (!navigator.geolocation) { showToast('Geolocation is not supported.'); return; }
+  if (locWatchId !== null) {
+    navigator.geolocation.clearWatch(locWatchId);
+    locWatchId = null;
+    clearFix();
+    btnLocate.classList.remove('active');
+    return;
+  }
+  btnLocate.classList.add('active');
+  let first = true;
+  locWatchId = navigator.geolocation.watchPosition((pos) => {
+    showFix(pos);
+    if (first) { first = false; map.setView(lastFix.latlng, Math.max(map.getZoom(), 18)); }
+  }, (err) => {
+    geoError(err);
+    navigator.geolocation.clearWatch(locWatchId);
+    locWatchId = null;
+    btnLocate.classList.remove('active');
+  }, { enableHighAccuracy: true, maximumAge: 2000 });
+});
+
+btnHere.addEventListener('click', () => {
+  if (!navigator.geolocation) { showToast('Geolocation is not supported.'); return; }
+  const add = (pos) => {
+    showFix(pos);
+    const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+    addPoint({ id: nextId++, description: nextDescription(), lat, lng });
+    map.setView([lat, lng], Math.max(map.getZoom(), 18));
+    showToast(`Point added at your location (±${Math.round(accuracy)} m)`);
+  };
+  if (locWatchId !== null && lastFix) {
+    // reuse the live fix from the running watch
+    add({ coords: { latitude: lastFix.latlng.lat, longitude: lastFix.latlng.lng, accuracy: lastFix.accuracy } });
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(add, geoError, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+});
 
 // ── Auto-description logic ────────────────────────────────────────────────────
 function nextDescription() {
@@ -287,10 +388,23 @@ function bindPopup(marker, point) {
     const p = points.find(pt => pt.id === point.id) || point;
     const div = document.createElement('div');
     div.innerHTML = `
-      <div class="popup-desc">${escHtml(p.description)}</div>
+      ${touchUI ? `<input class="popup-input" value="${escHtml(p.description)}" />` : `<div class="popup-desc">${escHtml(p.description)}</div>`}
       <div class="popup-coords">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>
       <button class="popup-delete">Delete point</button>
     `;
+    const input = div.querySelector('input');
+    if (input) {
+      // no inline editing on touch screens: rename here instead
+      input.addEventListener('change', () => {
+        p.description = input.value.trim() || p.description;
+        input.value = p.description;
+        renderRows(true);
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') input.blur();
+        e.stopPropagation();
+      });
+    }
     div.querySelector('.popup-delete').addEventListener('click', () => {
       map.closePopup();
       deletePoint(p.id);
@@ -432,7 +546,8 @@ function recolorGroup(g) {
 }
 const defaultIcon  = new L.Icon.Default();
 const hlIcon       = L.divIcon({ className: 'marker-hl', iconSize: [20, 20], iconAnchor: [10, 10] });
-const handleIcon   = L.divIcon({ className: 'vertex-handle', iconSize: [12, 12], iconAnchor: [6, 6] });
+const handleSize   = touchUI ? 36 : 12; // larger hit area for fingers
+const handleIcon   = L.divIcon({ className: 'vertex-handle', html: '<i></i>', iconSize: [handleSize, handleSize], iconAnchor: [handleSize / 2, handleSize / 2] });
 
 // Ray casting; x = lng, y = lat
 function pointInPolygon(lat, lng, verts) {
@@ -456,18 +571,36 @@ function areaClick(latlng) {
   if (draft) {
     draft.vertices.push(latlng);
     draft.line.setLatLngs(draft.vertices);
+    updateDrawBar();
     return;
   }
   draft = {
     vertices: [latlng],
     line: L.polyline([latlng], { color: '#e94560', dashArray: '6', interactive: false }).addTo(map),
     start: L.circleMarker(latlng, {
-      radius: 8, color: '#fff', weight: 2, fillColor: '#e94560', fillOpacity: 1,
+      radius: touchUI ? 14 : 8, color: '#fff', weight: 2, fillColor: '#e94560', fillOpacity: 1,
       bubblingMouseEvents: false,
     }).addTo(map),
   };
   draft.start.on('click', () => { if (draft.vertices.length >= 3) finishDraft(); });
+  updateDrawBar();
 }
+
+// Floating Undo / Finish / Cancel while drawing (also the way to finish on touch screens)
+function updateDrawBar() {
+  drawBar.style.display = tool === 'area' ? 'flex' : 'none';
+  drawFinish.disabled = !draft || draft.vertices.length < 3;
+}
+
+document.getElementById('draw-undo').addEventListener('click', () => {
+  if (!draft) return;
+  if (draft.vertices.length <= 1) { cancelDraft(); return; }
+  draft.vertices.pop();
+  draft.line.setLatLngs(draft.vertices);
+  updateDrawBar();
+});
+drawFinish.addEventListener('click', () => { if (draft && draft.vertices.length >= 3) finishDraft(); });
+document.getElementById('draw-cancel').addEventListener('click', () => setTool('pan'));
 
 map.on('mousemove', (e) => {
   if (draft) draft.line.setLatLngs([...draft.vertices, e.latlng]);
@@ -478,6 +611,7 @@ function cancelDraft() {
   map.removeLayer(draft.line);
   map.removeLayer(draft.start);
   draft = null;
+  updateDrawBar();
 }
 
 function finishDraft() {
@@ -521,8 +655,14 @@ function addGroup({ id, name, vertices, description = '' }) {
   const layer = L.polygon(vertices, { color, className: 'group-poly' }).addTo(map);
   const g = { id, name, description, vertices, layer, color, handles: null };
   layer.bindPopup(() => groupPopupContent(g));
-  layer.on('mouseover', () => hoverGroupName(g.name, true));
-  layer.on('mouseout', () => hoverGroupName(g.name, false));
+  if (touchUI) {
+    // no hover on touch: the highlight lasts while the parcel's popup is open
+    layer.on('popupopen', () => hoverGroupName(g.name, true));
+    layer.on('popupclose', () => hoverGroupName(g.name, false));
+  } else {
+    layer.on('mouseover', () => hoverGroupName(g.name, true));
+    layer.on('mouseout', () => hoverGroupName(g.name, false));
+  }
   groups.push(g);
   return g;
 }
@@ -578,9 +718,13 @@ function startEdit(g) {
       .on('dragend', groupsChanged)
       .addTo(map)
   );
+  editBar.style.display = 'flex';
 }
 
+document.getElementById('edit-done').addEventListener('click', () => stopEdit());
+
 function stopEdit() {
+  editBar.style.display = 'none';
   groups.forEach(g => {
     if (!g.handles) return;
     g.handles.forEach(h => map.removeLayer(h));
@@ -818,12 +962,23 @@ function convexHull(pts) {
 }
 
 // A cluster's area is the convex hull of its points
-markerCluster.on('clustermouseover', (e) => {
-  const latlngs = e.layer.getAllChildMarkers().map(m => m.getLatLng());
+function clusterStatsHtml(cluster) {
+  const latlngs = cluster.getAllChildMarkers().map(m => m.getLatLng());
   const hull = convexHull(latlngs.map(ll => [ll.lat, ll.lng]));
   const donum = hull.length >= 3 ? polygonAreaM2(hull) / 1000 : 0;
-  e.layer.unbindTooltip().bindTooltip(statsHtml(latlngs.length, donum), { direction: 'top', className: 'stats-tip' }).openTooltip();
-});
+  return statsHtml(latlngs.length, donum);
+}
+
+if (touchUI) {
+  // no hover on touch: tapping a cluster (which also zooms in) reports its stats as a toast
+  markerCluster.on('clusterclick', (e) => {
+    showToast(clusterStatsHtml(e.layer).replace(/<br>/g, ' · ').replace(/<\/?b>/g, ''));
+  });
+} else {
+  markerCluster.on('clustermouseover', (e) => {
+    e.layer.unbindTooltip().bindTooltip(clusterStatsHtml(e.layer), { direction: 'top', className: 'stats-tip' }).openTooltip();
+  });
+}
 
 let groupModalTotals = false;
 const swatch = (name) => `<span class="group-swatch" style="background:${groupColor(name)}"></span>`;
@@ -848,7 +1003,7 @@ function openGroupModal() {
     });
     byName.forEach((t, name) => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${swatch(name)}${escHtml(name)}</td><td>${t.n}</td><td>${t.count}</td><td>${t.donum.toFixed(2)}</td><td>${dens(t.count, t.donum)}</td>`;
+      tr.innerHTML = `<td>${swatch(name)}${escHtml(name)}</td><td data-l="Groups">${t.n}</td><td data-l="Points">${t.count}</td><td data-l="Area (dönüm)">${t.donum.toFixed(2)}</td><td data-l="Trees/dönüm">${dens(t.count, t.donum)}</td>`;
       groupModalBody.appendChild(tr);
     });
   } else {
@@ -856,7 +1011,7 @@ function openGroupModal() {
       const count = points.filter(p => inGroup(p, g)).length;
       const tr = document.createElement('tr');
       const donum = polygonAreaM2(g.vertices) / 1000;
-      tr.innerHTML = `<td>${swatch(g.name)}${escHtml(g.name)}</td><td>${count}</td><td>${donum.toFixed(2)}</td><td>${dens(count, donum)}</td><td><input class="popup-input" /></td>`;
+      tr.innerHTML = `<td>${swatch(g.name)}${escHtml(g.name)}</td><td data-l="Points">${count}</td><td data-l="Area (dönüm)">${donum.toFixed(2)}</td><td data-l="Trees/dönüm">${dens(count, donum)}</td><td data-l="Description"><input class="popup-input" /></td>`;
       const input = tr.querySelector('input');
       input.value = g.description;
       input.addEventListener('input', () => { g.description = input.value; });
@@ -880,7 +1035,11 @@ groupModal.addEventListener('click', (e) => { if (e.target === groupModal) close
 // The table is virtualized: only rows near the viewport exist in the DOM,
 // with spacer rows standing in for the rest so the scrollbar stays accurate.
 const tableWrap = document.querySelector('.table-wrapper');
-const ROW_H = 36, ROW_BUFFER = 10;
+const ROW_BUFFER = 10;
+let ROW_H = 36;
+const syncRowH = () => { ROW_H = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--row-h')) || 36; };
+syncRowH();
+window.matchMedia('(max-width: 800px)').addEventListener('change', () => { syncRowH(); renderRows(true); });
 let visible = points;
 let rowRange = [-1, -1];
 
@@ -891,6 +1050,7 @@ function filtersActive() {
 function updateCount() {
   refreshStats();
   countEl.textContent = filtersActive() ? `${visible.length} / ${points.length}` : points.length;
+  listCountEl.textContent = countEl.textContent;
   emptyEl.classList.toggle('visible', points.length === 0);
 }
 
@@ -955,7 +1115,7 @@ function makeRow(p, i) {
   const tdDesc = document.createElement('td');
   const descSpan = document.createElement('span');
   descSpan.className = 'desc-cell';
-  descSpan.contentEditable = 'true';
+  descSpan.contentEditable = touchUI ? 'false' : 'true'; // on touch, rename from the point's popup
   descSpan.textContent = p.description;
   descSpan.title = 'Click to edit';
   descSpan.addEventListener('blur', () => {
@@ -969,7 +1129,7 @@ function makeRow(p, i) {
     if (e.key === 'Enter') { e.preventDefault(); descSpan.blur(); }
     e.stopPropagation();
   });
-  descSpan.addEventListener('click', (e) => e.stopPropagation());
+  if (!touchUI) descSpan.addEventListener('click', (e) => e.stopPropagation());
   tdDesc.appendChild(descSpan);
 
   const tdLat = document.createElement('td');
@@ -998,6 +1158,7 @@ function makeRow(p, i) {
   tr.append(tdNum, tdDesc, tdLat, tdLng, tdGroups, tdDel);
 
   tr.addEventListener('click', () => {
+    setListOpen(false); // on small screens the list covers the map
     map.setView([p.lat, p.lng], Math.max(map.getZoom(), 14));
     p.marker.openPopup();
   });

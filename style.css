@@ -4,6 +4,11 @@
   padding: 0;
 }
 
+:root {
+  --toolbar-h: 48px;
+  --row-h: 36px;
+}
+
 html, body {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -12,13 +17,23 @@ html, body {
   color: #e0e0e0;
 }
 
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  html, body { height: 100dvh; }
+}
+
 /* ── Toolbar ── */
 .toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 16px;
-  height: 48px;
+  height: var(--toolbar-h);
   background: #16213e;
   border-bottom: 1px solid #0f3460;
   flex-shrink: 0;
@@ -40,6 +55,7 @@ html, body {
   color: #e0e0e0;
   cursor: pointer;
   font-size: 13px;
+  white-space: nowrap;
   transition: background 0.15s, border-color 0.15s;
 }
 
@@ -81,6 +97,10 @@ html, body {
 .filter-value {
   min-width: 42px;
   color: #e0e0e0;
+}
+
+#group-select {
+  max-width: 150px; /* long group names would otherwise stretch the toolbar */
 }
 
 .filter-bar + .provider-bar {
@@ -149,7 +169,8 @@ html, body {
 /* ── Main layout ── */
 .main {
   display: flex;
-  height: calc(100vh - 48px);
+  flex: 1;
+  min-height: 0;
 }
 
 #map {
@@ -223,11 +244,20 @@ html, body {
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
 }
 
+/* The handle element is the (possibly larger, touch-friendly) hit area; <i> is the visible square */
 .vertex-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: move;
+}
+
+.vertex-handle i {
+  width: 12px;
+  height: 12px;
   background: #fff;
   border: 2px solid #e94560;
   border-radius: 2px;
-  cursor: move;
 }
 
 /* ── Sidebar ── */
@@ -302,10 +332,11 @@ html, body {
   border-bottom: 1px solid #0f3460;
   transition: background 0.1s;
   cursor: pointer;
-  height: 36px;
+  height: var(--row-h);
 }
 
 #points-table tbody tr.spacer {
+  height: 0;
   border: none;
   pointer-events: none;
 }
@@ -629,4 +660,228 @@ html, body {
   margin-right: 6px;
   border-radius: 2px;
   vertical-align: middle;
+}
+
+/* ── Responsive: toolbar menu, locate, floating bars ── */
+.toolbar-menu {
+  display: contents;
+}
+
+.btn-menu, .btn-list {
+  display: none;
+}
+
+/* GPS buttons are icon-only on the desktop toolbar to keep it from overflowing */
+#btn-locate .lbl, #btn-here .lbl { display: none; }
+
+.file-actions {
+  display: contents;
+}
+
+.btn-icon.active {
+  background: #3a7bd5;
+  border-color: #3a7bd5;
+  color: #fff;
+}
+
+.map-bar {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 1100;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(22, 33, 62, 0.92);
+  border: 1px solid #0f3460;
+  border-radius: 8px;
+  backdrop-filter: blur(4px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.loc-dot {
+  background: #3a7bd5;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+/* Narrow-ish desktops, tablets, phones: secondary toolbar controls move into a menu */
+@media (max-width: 1560px) {
+  :root { --toolbar-h: 52px; }
+
+  .toolbar {
+    gap: 6px;
+    padding: 0 max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
+    position: relative;
+    z-index: 1500;
+  }
+
+  .app-title { margin-right: auto; }
+
+  .btn-icon {
+    min-width: 42px;
+    height: 42px;
+    padding: 0 10px;
+    font-size: 17px;
+  }
+
+  .btn-icon .lbl { display: none; }
+  .btn-menu { display: inline-block; }
+
+  .toolbar-menu {
+    display: none;
+    position: fixed;
+    top: var(--toolbar-h);
+    left: 0;
+    right: 0;
+    max-height: calc(100% - var(--toolbar-h));
+    overflow-y: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 14px max(14px, env(safe-area-inset-right)) 14px max(14px, env(safe-area-inset-left));
+    background: #16213e;
+    border-bottom: 1px solid #0f3460;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  }
+
+  .toolbar.menu-open .toolbar-menu { display: flex; }
+
+  .toolbar-menu .btn { min-height: 42px; }
+
+  .file-actions { display: flex; gap: 10px; }
+  .file-actions .btn { flex: 1; }
+
+  .filter-bar, .provider-bar {
+    flex-wrap: wrap;
+    margin-left: 0;
+    row-gap: 10px;
+  }
+
+  .filter-bar .filter-label[for] { flex: 0 0 auto; }
+  .filter-bar #group-select { flex: 1; min-width: 120px; max-width: none; }
+  .filter-bar #dup-distance { flex: 1; min-width: 120px; }
+  .provider-bar .provider-select { flex: 1; }
+  .api-key-input { width: 100%; }
+
+  .provider-select, .api-key-input { min-height: 40px; }
+  input[type="checkbox"] { width: 20px; height: 20px; }
+  .help-links a { padding: 8px 14px; }
+}
+
+/* Phones & small tablets: points list becomes a full-screen panel toggled from the toolbar */
+@media (max-width: 800px) {
+  :root { --row-h: 52px; }
+
+  .btn-list { display: inline-block; }
+
+  .sidebar {
+    display: none;
+    position: fixed;
+    top: var(--toolbar-h);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    z-index: 1400;
+    border-left: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  body.list-open .sidebar { display: flex; }
+
+  .sidebar-header { padding: 14px; }
+
+  #points-table td { padding: 6px 8px; }
+  .desc-cell { max-width: 38vw; }
+
+  .btn-delete {
+    font-size: 20px;
+    padding: 10px 12px;
+  }
+
+  .imagery-date {
+    right: auto;
+    left: 10px;
+    bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .toast {
+    bottom: auto;
+    top: calc(var(--toolbar-h) + 12px);
+    max-width: calc(100vw - 24px);
+    transform: translateX(-50%) translateY(-20px);
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .map-bar { bottom: calc(40px + env(safe-area-inset-bottom)); }
+  .map-bar .btn { min-height: 44px; padding: 0 16px; }
+
+  /* 16px inputs stop iOS from zooming the page on focus */
+  input, select, .popup-input { font-size: 16px; }
+
+  .leaflet-popup-content { font-size: 15px; }
+  .popup-btn, .popup-delete { min-height: 40px; font-size: 14px; }
+  .popup-input { padding: 8px; }
+
+  /* group modal: full-screen cards */
+  .modal-overlay { align-items: stretch; }
+
+  .modal {
+    width: 100%;
+    max-width: 100vw;
+    max-height: 100%;
+    height: 100%;
+    border-radius: 0;
+    padding: 14px max(14px, env(safe-area-inset-right)) calc(14px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  }
+
+  .modal-header { flex-wrap: wrap; gap: 8px; }
+  .modal-header .btn { min-height: 40px; }
+  .modal-options { flex-direction: column; gap: 12px; }
+  .modal-close { font-size: 30px; padding: 0 8px; }
+
+  .modal-table, .modal-table tbody { display: block; }
+  .modal-table thead { display: none; }
+
+  .modal-table tr {
+    display: block;
+    margin-bottom: 10px;
+    border: 1px solid #0f3460;
+    border-radius: 6px;
+  }
+
+  .modal-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #0f3460;
+  }
+
+  .modal-table td:last-child { border-bottom: none; }
+  .modal-table td::before { content: attr(data-l); color: #8899aa; flex-shrink: 0; }
+  .modal-table td:first-child { font-weight: 600; }
+  .modal-table td:first-child::before { content: none; }
+  .modal-table td .popup-input { flex: 1; min-width: 0; }
+}
+
+/* Very narrow screens: hide the coordinate columns, keep description + groups */
+@media (max-width: 600px) {
+  #points-table th:nth-child(3), #points-table td:nth-child(3),
+  #points-table th:nth-child(4), #points-table td:nth-child(4) { display: none; }
+  .app-title { display: none; }
+  .btn-menu { margin-left: auto; }
+}
+
+/* Touch devices: bigger drag targets everywhere, no hover assumptions */
+@media (pointer: coarse) {
+  .btn { min-height: 40px; }
+  #points-table tbody tr { cursor: default; }
 }

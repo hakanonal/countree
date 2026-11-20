@@ -74,6 +74,20 @@ The window has three parts: the **toolbar** at the top, the **map** on the left 
 
 The right-hand table lists every point with its number, description, latitude, longitude and the groups it belongs to. The number next to **POINTS** is the total count (or `shown / total` while a filter is active). The table is virtualised, so even tens of thousands of rows scroll smoothly.
 
+### Phones and tablets
+
+The same page adapts to small screens:
+
+- **⋮ menu** — Save/Load CSV, the group filter, the close-points slider, the satellite provider and help links move into this menu. On wide screens they stay in the toolbar.
+- **☰ list** — the points list opens as a full-screen panel (the number is your point count). Tapping a row closes the list and shows that point on the map.
+- **Rename on touch** — there is no inline editing in the list; tap a point's marker and edit its name in the popup.
+- **Tap instead of hover** — tap a parcel to highlight every parcel with the same name (the highlight lasts while its popup is open); tap a cluster of points to see its tree count and area in a message.
+- **Draw Area** — a bar with **Undo**, **Finish** and **Cancel** appears while drawing, so you do not need the Esc key or to hit the first corner exactly. **Edit shape** shows a **Done editing** button, and corner handles are larger.
+- **◎ Locate** — shows your live GPS position and accuracy on the map; tap again to stop.
+- **⊕ Add here** — adds a point at your current GPS position and reports the accuracy (e.g. ±4 m). Wait for a good accuracy before adding.
+
+Browsers only allow location access on `https://` pages or `localhost`, so serve the app over HTTPS when using it on a phone.
+
 ## 3. Adding and managing points
 
 ### Add a point

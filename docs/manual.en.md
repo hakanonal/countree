@@ -22,7 +22,7 @@ Countree is a single-page web app for dropping, counting and organising geo-poin
 ## 1. Getting started
 
 1. Open `index.html` in a modern browser (double-click it, or run `open index.html`). An internet connection is required because the map library and satellite tiles are loaded online.
-2. The map opens in **Add Mode**, ready for you to place points.
+2. The map opens in **Pan Mode**. Click **✥ Pan Mode** to switch to **Add Mode** when you want to place points.
 3. To start from existing data, click **Load CSV** and pick a file (see [section 8](#8-saving-and-loading-csv-files)).
 
 ![Countree right after opening](images/01-empty.png)
@@ -64,7 +64,7 @@ The window has three parts: the **toolbar** at the top, the **map** on the left 
 | **Load CSV** | Replaces the current data with a CSV file. |
 | **Group** dropdown | Shows only one group's points and highlights its area. |
 | **☰ Groups** | Opens the group list with area, tree count and density. |
-| **Stats view** | Replaces markers with one summary label per group. |
+| **Stats view** (in the **☰ Groups** window) | Replaces markers with one summary label per group. |
 | **Close points** + slider | Shows only points that have a neighbour within the chosen distance. |
 | **Satellite** dropdown | Selects the imagery provider. |
 
@@ -152,7 +152,7 @@ Close the window with **×**, **Esc**, or by clicking outside it.
 
 ### Stats view
 
-Tick **Stats view** to hide the individual markers and show one label per group with its tree count, area and density.
+Open **☰ Groups** and tick **Stats view** to hide the individual markers and show one label per group with its tree count, area and density.
 
 ![Stats view](images/07-stats-view.png)
 

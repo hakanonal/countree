@@ -1,7 +1,7 @@
 // ── State ─────────────────────────────────────────────────────────────────────
 let points = [];       // { id, description, lat, lng, marker }
 let nextId = 1;
-let tool = 'add';      // 'add' | 'pan' | 'area'
+let tool = 'pan';      // 'add' | 'pan' | 'area'
 let groups = [];       // { id, name, vertices: [[lat, lng], ...], layer, handles }
 let nextGroupId = 1;
 let selectedGroupId = null;
@@ -170,6 +170,7 @@ const dupEnable       = document.getElementById('dup-enable');
 const dupDistance     = document.getElementById('dup-distance');
 const dupDistanceVal  = document.getElementById('dup-distance-value');
 const statsEnable     = document.getElementById('stats-enable');
+const statsFit        = document.getElementById('stats-fit');
 const btnArea         = document.getElementById('btn-area');
 const groupSelect     = document.getElementById('group-select');
 const btnGroupList    = document.getElementById('btn-group-list');
@@ -241,7 +242,7 @@ function setTool(t) {
   mapEl.classList.toggle('pan-mode', t === 'pan');
 }
 
-setTool('add');
+setTool('pan');
 
 btnMode.addEventListener('click', () => setTool(tool === 'add' ? 'pan' : 'add'));
 btnArea.addEventListener('click', () => setTool(tool === 'area' ? 'pan' : 'area'));
@@ -369,14 +370,64 @@ dupDistance.addEventListener('input', () => {
 
 // ── Areas (groups) ────────────────────────────────────────────────────────────
 // Groups sharing the same key (group name; exact match) get the same color.
-// Each new key takes the next hue, spaced by the golden angle so colors stay distinct.
+// A new key gets the hue farthest from the hues of names whose groups lie within
+// ADJACENT_M of its polygon (then farthest from all hues in use). Colors never change once assigned.
+const ADJACENT_M = 2;
 const keyHues = new Map();
-function groupColor(key) {
-  if (!keyHues.has(key)) keyHues.set(key, (keyHues.size * 137.508) % 360);
-  return `hsl(${keyHues.get(key).toFixed(0)}, 70%, 50%)`;
+const hueGap = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 360 - d); };
+
+// Polygons are "adjacent" when they overlap or any boundary points are within ADJACENT_M meters
+function polygonsAdjacent(va, vb) {
+  const R = 6371000, rad = Math.PI / 180;
+  const lat0 = va[0][0];
+  const proj = (v) => v.map(([lat, lng]) => [R * lng * rad * Math.cos(lat0 * rad), R * lat * rad]);
+  const A = proj(va), B = proj(vb);
+  const segDist = (p, q, r) => {
+    const dx = r[0] - q[0], dy = r[1] - q[1], l2 = dx * dx + dy * dy;
+    const t = l2 ? Math.max(0, Math.min(1, ((p[0] - q[0]) * dx + (p[1] - q[1]) * dy) / l2)) : 0;
+    return Math.hypot(p[0] - q[0] - t * dx, p[1] - q[1] - t * dy);
+  };
+  const orient = (p, q, r) => Math.sign((q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]));
+  const cross = (p1, p2, q1, q2) => orient(p1, p2, q1) !== orient(p1, p2, q2) && orient(q1, q2, p1) !== orient(q1, q2, p2);
+  const inside = (p, poly) => {
+    let in_ = false;
+    poly.forEach((a, i) => {
+      const b = poly[(i + 1) % poly.length];
+      if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) in_ = !in_;
+    });
+    return in_;
+  };
+  if (inside(A[0], B) || inside(B[0], A)) return true;
+  for (let i = 0; i < A.length; i++) {
+    const a1 = A[i], a2 = A[(i + 1) % A.length];
+    if (B.some(p => segDist(p, a1, a2) <= ADJACENT_M)) return true;
+    for (let j = 0; j < B.length; j++) {
+      const b1 = B[j], b2 = B[(j + 1) % B.length];
+      if (cross(a1, a2, b1, b2) || segDist(a1, b1, b2) <= ADJACENT_M) return true;
+    }
+  }
+  return false;
+}
+
+function groupColor(key, vertices, self) {
+  if (!keyHues.has(key)) {
+    const near = vertices
+      ? groups.filter(o => o !== self && o.name !== key && keyHues.has(o.name) && polygonsAdjacent(vertices, o.vertices))
+          .map(o => keyHues.get(o.name))
+      : [];
+    const used = [...keyHues.values()];
+    const minGap = (h, list) => list.reduce((m, u) => Math.min(m, hueGap(h, u)), 180);
+    let best = 0, bestScore = [-1, -1];
+    for (let h = 0; h < 360; h += 5) {
+      const score = [minGap(h, near), minGap(h, used)];
+      if (score[0] > bestScore[0] || (score[0] === bestScore[0] && score[1] > bestScore[1])) { best = h; bestScore = score; }
+    }
+    keyHues.set(key, best);
+  }
+  return `hsl(${keyHues.get(key)}, 70%, 50%)`;
 }
 function recolorGroup(g) {
-  g.color = groupColor(g.name);
+  g.color = groupColor(g.name, g.vertices, g);
   g.layer.setStyle({ color: g.color });
 }
 const defaultIcon  = new L.Icon.Default();
@@ -466,10 +517,12 @@ function finishDraft() {
 }
 
 function addGroup({ id, name, vertices, description = '' }) {
-  const color = groupColor(name);
+  const color = groupColor(name, vertices);
   const layer = L.polygon(vertices, { color, className: 'group-poly' }).addTo(map);
   const g = { id, name, description, vertices, layer, color, handles: null };
   layer.bindPopup(() => groupPopupContent(g));
+  layer.on('mouseover', () => hoverGroupName(g.name, true));
+  layer.on('mouseout', () => hoverGroupName(g.name, false));
   groups.push(g);
   return g;
 }
@@ -553,6 +606,31 @@ function selectGroup(id) {
   groupsChanged();
 }
 
+function groupStyle(g) {
+  return g.id === selectedGroupId
+    ? { weight: 4, opacity: 1, fillOpacity: 0.35 }
+    : selectedGroupId !== null
+      ? { weight: 1, opacity: 0.4, fillOpacity: 0.05 }
+      : { weight: 2, opacity: 0.9, fillOpacity: 0.15 };
+}
+
+// Hovering a parcel highlights every parcel with the same name, plus that name's stats box
+let hoverStatsLabel = null;
+function hoverGroupName(name, on) {
+  groups.forEach(o => {
+    if (o.name === name) o.layer.setStyle(on ? { weight: 4, opacity: 1, fillOpacity: 0.35 } : groupStyle(o));
+  });
+  statsLabels.forEach(m => {
+    if (m.statsName === name && m.getElement()) m.getElement().classList.toggle('hl', on);
+  });
+  // With the stats view off, show just this name's box while hovering
+  if (hoverStatsLabel) { map.removeLayer(hoverStatsLabel); hoverStatsLabel = null; }
+  if (on && !statsEnable.checked) {
+    hoverStatsLabel = nameStatsMarker(name);
+    if (statsFit.checked) fitStatsLabel(hoverStatsLabel);
+  }
+}
+
 // Refresh everything derived from groups: selector, polygon styling, membership
 function groupsChanged() {
   groupSelect.innerHTML = '<option value="">All groups</option>';
@@ -565,13 +643,8 @@ function groupsChanged() {
   groupSelect.value = selectedGroupId === null ? '' : String(selectedGroupId);
 
   groups.forEach(g => {
-    const on = g.id === selectedGroupId;
-    g.layer.setStyle(on
-      ? { weight: 4, opacity: 1, fillOpacity: 0.35 }
-      : selectedGroupId !== null
-        ? { weight: 1, opacity: 0.4, fillOpacity: 0.05 }
-        : { weight: 2, opacity: 0.9, fillOpacity: 0.15 });
-    if (on) g.layer.bringToFront();
+    g.layer.setStyle(groupStyle(g));
+    if (g.id === selectedGroupId) g.layer.bringToFront();
   });
   points.forEach(p => { p.groups = groups.filter(g => inGroup(p, g)); });
   renderTable();
@@ -600,28 +673,127 @@ function polygonAreaM2(vertices) {
 // Stats view swaps the point markers for one label per group (trees, dönüm, trees/dönüm).
 // Hovering a marker cluster (a sub-group of points) shows the same numbers for its points.
 function statsHtml(count, donum) {
-  const density = donum > 0 ? (count / donum).toFixed(1) : '–';
-  return `<b>${count}</b> tree${count !== 1 ? 's' : ''}<br>${donum.toFixed(2)} dönüm<br>${density} trees/dönüm`;
+  const lines = [];
+  if (count > 0) lines.push(`<b>${count}</b> tree${count !== 1 ? 's' : ''}`);
+  if (donum > 0) lines.push(`${donum.toFixed(2)} dönüm`);
+  if (count > 0 && donum > 0) lines.push(`${(count / donum).toFixed(1)} trees/dönüm`);
+  return lines.join('<br>');
 }
 
 let statsLabels = [];
+
+// One stats box for a group name, summarising all groups that share it
+function nameStatsMarker(name) {
+  const t = { count: 0, donum: 0, bounds: L.latLngBounds([]) };
+  groups.filter(g => g.name === name).forEach(g => {
+    t.count += points.filter(p => p.groups.includes(g)).length;
+    t.donum += polygonAreaM2(g.vertices) / 1000;
+    t.bounds.extend(g.layer.getBounds());
+  });
+  const html = `<div class="group-stats-box"><div class="group-stats-name">${swatch(name)}${escHtml(name)}</div>` + statsHtml(t.count, t.donum) + '</div>';
+  const m = L.marker(t.bounds.getCenter(), {
+    interactive: false,
+    icon: L.divIcon({ className: 'group-stats', html, iconSize: null }),
+  }).addTo(map);
+  m.home = m.getLatLng();
+  m.statsName = name;
+  return m;
+}
 
 function refreshStats() {
   statsLabels.forEach(l => map.removeLayer(l));
   statsLabels = [];
   if (!statsEnable.checked) return;
+  statsLabels = [...new Set(groups.map(g => g.name))].map(nameStatsMarker);
+  layoutStatsLabels();
+}
 
-  const counts = new Map();
-  points.forEach(p => p.groups.forEach(g => counts.set(g, (counts.get(g) || 0) + 1)));
-  groups.forEach(g => {
-    const html = `<div class="group-stats-name">${escHtml(g.name)}</div>` +
-      statsHtml(counts.get(g) || 0, polygonAreaM2(g.vertices) / 1000);
-    statsLabels.push(L.marker(g.layer.getBounds().getCenter(), {
-      interactive: false,
-      icon: L.divIcon({ className: 'group-stats', html, iconSize: null }),
-    }).addTo(map));
+const statsBox = (m) => m.getElement().querySelector('.group-stats-box');
+
+// With "Fit stats inside parcels": search (in screen pixels) for the largest scale, at some
+// rotation and position, where the whole box lies inside the combined area of the label's name.
+// Returns true when the box was placed.
+function fitStatsLabel(m) {
+  const box = statsBox(m);
+  box.style.transform = '';
+  m.setLatLng(m.home);
+  const w = box.offsetWidth, h = box.offsetHeight;
+  const inPoly = (p, poly) => {
+    let in_ = false;
+    poly.forEach((a, i) => {
+      const b = poly[(i + 1) % poly.length];
+      if ((a[1] > p[1]) !== (b[1] > p[1]) && p[0] < (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]) + a[0]) in_ = !in_;
+    });
+    return in_;
+  };
+  const polys = groups.filter(g => g.name === m.statsName)
+    .map(g => g.vertices.map(v => { const p = map.latLngToContainerPoint(v); return [p.x, p.y]; }));
+  const angles = [0, -15, 15, -30, 30, -45, 45, -60, 60, -75, 75, 90];
+
+  // The box may span several parcels: it only has to lie inside their union
+  const inside = (p) => polys.some(poly => inPoly(p, poly));
+  const all = polys.flat();
+  const xs = all.map(p => p[0]), ys = all.map(p => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const cx = xs.reduce((s, x) => s + x, 0) / xs.length, cy = ys.reduce((s, y) => s + y, 0) / ys.length;
+  const centers = [];
+  for (let i = 0; i <= 16; i++) for (let j = 0; j <= 16; j++) {
+    const c = [x0 + (x1 - x0) * i / 16, y0 + (y1 - y0) * j / 16];
+    if (inside(c)) centers.push(c);
+  }
+  // sample points over the box (frame coordinates, as fractions of its half extents)
+  const samples = [];
+  for (let u = -1; u <= 1; u += 1 / 3) for (let v = -1; v <= 1; v += 0.5) samples.push([u, v]);
+
+  for (const scale of [1, 0.85, 0.7, 0.55, 0.4]) {
+    const hw = w * scale / 2, hh = h * scale / 2;
+    let best = null;
+    centers.forEach(c => {
+      for (const ang of angles) {
+        const t = ang * Math.PI / 180, cos = Math.cos(t), sin = Math.sin(t);
+        if (!samples.every(([u, v]) => {
+          const du = u * hw, dv = v * hh;
+          return inside([c[0] + du * cos - dv * sin, c[1] + du * sin + dv * cos]);
+        })) continue;
+        const score = Math.hypot(c[0] - cx, c[1] - cy) + Math.abs(ang) * 2;
+        if (!best || score < best.score) best = { score, c, ang, scale };
+      }
+    });
+    if (best) {
+      m.setLatLng(map.containerPointToLatLng(best.c));
+      box.style.transform = `translate(-50%, -50%) rotate(${best.ang}deg) scale(${best.scale})`;
+      return true;
+    }
+  }
+  return false;
+}
+
+// Lay out all stats boxes. Fitted boxes sit inside their parcels. The rest have a fixed pixel
+// size, so overlaps depend on zoom: reset, then push each overlapping one down (in screen
+// pixels) until it clears the boxes placed before it.
+function layoutStatsLabels() {
+  const placed = [];
+  const loose = [];
+  statsLabels.forEach(m => {
+    statsBox(m).style.transform = '';
+    m.setLatLng(m.home);
+    if (statsFit.checked && fitStatsLabel(m)) {
+      const r = statsBox(m).getBoundingClientRect();
+      placed.push({ left: r.left, right: r.right, top: r.top, bottom: r.bottom });
+    } else loose.push(m);
+  });
+  loose.forEach(m => {
+    const r = statsBox(m).getBoundingClientRect();
+    let dy = 0, hit;
+    while ((hit = placed.find(p => r.left < p.right && r.right > p.left && r.top + dy < p.bottom && r.bottom + dy > p.top))) {
+      dy = hit.bottom - r.top + 4;
+    }
+    placed.push({ left: r.left, right: r.right, top: r.top + dy, bottom: r.bottom + dy });
+    if (dy) m.setLatLng(map.containerPointToLatLng(map.latLngToContainerPoint(m.home).add([0, dy])));
   });
 }
+map.on('zoomend', () => { if (statsLabels.length) layoutStatsLabels(); });
+statsFit.addEventListener('change', () => { if (statsLabels.length) layoutStatsLabels(); });
 
 statsEnable.addEventListener('change', () => {
   if (statsEnable.checked) map.removeLayer(markerCluster);

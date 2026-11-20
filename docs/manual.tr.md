@@ -24,7 +24,7 @@ Countree, canlı bir uydu haritası üzerine coğrafi nokta (örneğin ağaç) y
 ## 1. Başlarken
 
 1. `index.html` dosyasını güncel bir tarayıcıda açın (çift tıklayın veya `open index.html` komutunu çalıştırın). Harita kütüphanesi ve uydu görüntüleri internetten yüklendiği için internet bağlantısı gerekir.
-2. Harita, nokta koymaya hazır şekilde **Add Mode** (Ekleme Modu) ile açılır.
+2. Harita **Pan Mode** (Gezinme Modu) ile açılır. Nokta koymak için **✥ Pan Mode** düğmesine tıklayarak **Add Mode**'a geçin.
 3. Mevcut verilerle başlamak için **Load CSV** düğmesine tıklayıp bir dosya seçin ([8. bölüm](#8-csv-dosyasını-kaydetme-ve-yükleme)).
 
 ![Countree açılış ekranı](images/01-empty.png)
@@ -66,7 +66,7 @@ Pencere üç bölümden oluşur: üstte **araç çubuğu**, solda **harita**, sa
 | **Load CSV** | Mevcut verinin yerine bir CSV dosyasını yükler. |
 | **Group** listesi | Yalnızca seçilen grubun noktalarını gösterir ve alanını vurgular. |
 | **☰ Groups** | Alan, ağaç sayısı ve yoğunluğu gösteren grup listesini açar. |
-| **Stats view** | İşaretçilerin yerine her grup için bir özet etiketi gösterir. |
+| **Stats view** (**☰ Groups** penceresinde) | İşaretçilerin yerine her grup için bir özet etiketi gösterir. |
 | **Close points** + kaydırıcı | Seçilen mesafe içinde komşusu olan noktaları gösterir. |
 | **Satellite** listesi | Uydu görüntüsü sağlayıcısını seçer. |
 
@@ -154,7 +154,7 @@ Pencereyi **×**, **Esc** veya pencerenin dışına tıklayarak kapatın.
 
 ### İstatistik görünümü
 
-Tek tek işaretçileri gizleyip her grup için ağaç sayısı, alan ve yoğunluk içeren bir etiket görmek için **Stats view** kutusunu işaretleyin.
+Tek tek işaretçileri gizleyip her grup için ağaç sayısı, alan ve yoğunluk içeren bir etiket görmek için **☰ Groups** penceresini açıp **Stats view** kutusunu işaretleyin.
 
 ![İstatistik görünümü](images/07-stats-view.png)
 

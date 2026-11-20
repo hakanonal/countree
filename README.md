@@ -10,7 +10,7 @@ The latest version of the app is deployed automatically to GitHub Pages, so you 
 
 ## Features
 
-- **Click to drop pins** — map is always in Add Mode; every click places a named marker
+- **Click to drop pins** — switch to Add Mode, then every click places a named marker
 - **Auto-named points** — points are named sequentially (e.g. `Tree 1`, `Tree 2`, …); the base label is inferred from the last point so you can rename freely
 - **Inline editing** — click any description in the sidebar to rename it in place
 - **Sidebar table** — lists all points with coordinates; clicking a row zooms the map to it

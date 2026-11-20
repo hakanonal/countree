@@ -12,7 +12,7 @@
 <body>
   <header class="toolbar">
     <span class="app-title">Countree</span>
-    <button id="btn-mode" class="btn btn-mode active">+ Add Mode</button>
+    <button id="btn-mode" class="btn btn-mode">✥ Pan Mode</button>
     <button id="btn-area" class="btn btn-mode" title="Click points to outline an area; click the first point to close it">▱ Draw Area</button>
     <button id="btn-save" class="btn">Save CSV</button>
     <button id="btn-load" class="btn">Load CSV</button>
@@ -24,9 +24,6 @@
         <option value="">All groups</option>
       </select>
       <button id="btn-group-list" class="btn" title="List all groups">☰ Groups</button>
-      <label class="filter-label" title="Replace points with per-group totals: trees, area (dönüm) and trees/dönüm">
-        <input type="checkbox" id="stats-enable" /> Stats view
-      </label>
       <label class="filter-label" title="Show only points that have another point within this distance">
         <input type="checkbox" id="dup-enable" /> Close points
       </label>
@@ -93,6 +90,14 @@
         <span id="group-modal-title">Groups</span>
         <button id="group-modal-toggle" class="btn" title="Sum groups that share a name">Σ Totals by name</button>
         <button id="group-modal-close" class="modal-close" title="Close">×</button>
+      </div>
+      <div class="modal-options">
+        <label class="filter-label" title="Replace points with per-group totals: trees, area (dönüm) and trees/dönüm">
+          <input type="checkbox" id="stats-enable" /> Stats view
+        </label>
+        <label class="filter-label" title="Place each stats box inside its parcels, rotated and scaled to fit">
+          <input type="checkbox" id="stats-fit" /> Fit stats inside parcels
+        </label>
       </div>
       <table class="modal-table">
         <thead id="group-modal-thead"></thead>

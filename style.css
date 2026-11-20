@@ -175,7 +175,17 @@ html, body {
   pointer-events: none !important;
 }
 
+/* The marker itself is a zero-size anchor; the box is centred on it and may be rotated/scaled */
 .group-stats {
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.group-stats-box {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: max-content;
   transform: translate(-50%, -50%);
   padding: 4px 8px;
@@ -187,6 +197,11 @@ html, body {
   text-align: center;
   white-space: nowrap;
   pointer-events: none;
+}
+
+.group-stats.hl .group-stats-box {
+  background: rgba(15, 20, 40, 1);
+  box-shadow: 0 0 0 3px #fff;
 }
 
 .group-stats-name {
@@ -543,6 +558,12 @@ html, body {
   align-items: center;
   margin-bottom: 12px;
   font-weight: 600;
+}
+
+.modal-options {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
 .modal-header .btn {

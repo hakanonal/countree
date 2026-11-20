@@ -202,6 +202,27 @@ ESRI seçiliyken sağ alt köşedeki rozet, görünümdeki uydu görüntüsünü
 
 **Load CSV** düğmesine tıklayıp bir dosya seçin. Açık veri varsa onay istenir, çünkü yükleme mevcut tüm nokta ve alanları **değiştirir**. Büyük dosyalar parça parça yüklenir, böylece tarayıcı donmaz. İşlem bitince harita yüklenen verilere sığdırılır ve nokta ile grup sayısını bildiren bir mesaj görünür.
 
+### URL'den dosya ve ayar açma
+
+Tüm ayarlar adres çubuğunda sorgu dizesi (query string) olarak da verilebilir; böylece bir bağlantı Countree'yi hazır yüklenmiş ve ayarlanmış olarak açar:
+
+```
+index.html?file=data/trees.csv&provider=esri&group=North%20orchard&stats=1
+```
+
+| Parametre | Değer | Etki |
+|---|---|---|
+| `file` | `index.html`'e **göre göreli** yol, örn. `data/trees.csv` | CSV'yi açılışta yükler (mevcut verinin yerine geçer, onay istenmez). Mutlak yollar, URL'ler (`http://…`), `/` ile başlayan ve `..` içeren yollar reddedilir. |
+| `provider` | `google_unofficial`, `esri`, `mapbox`, `google`, `here` | Uydu sağlayıcısını seçer. Anahtar gerektirenler anahtarı yine `config.js`'den okur. |
+| `mode` | `pan`, `add`, `area` | Pan Mode, Add Mode veya Draw Area ile başlar. |
+| `group` | Tam grup adı | O gruba filtreler ve yakınlaştırır (`file` yüklendikten sonra uygulanır). |
+| `close` | Metre cinsinden mesafe, 0,1–20 | Yakın nokta filtresini bu mesafeyle açar. |
+| `stats` | `1` veya `true` | İstatistik görünümünü açar. |
+| `fit` | `1` veya `true` | *Fit stats inside parcels* seçeneğini açar. |
+| `lat`, `lng`, `zoom` | Sayılar | Harita görünümünü ayarlar. En son uygulanır; dosya yüklendikten sonraki otomatik sığdırmanın yerine geçer. |
+
+Değerleri URL kodlamayı unutmayın (boşluk `%20`). `file` dosyasının alınabilmesi için uygulamanın http(s) üzerinden sunulması gerekir; `index.html` doğrudan diskten (`file://`) açıldığında tarayıcılar bunu engeller. Proje klasöründe statik bir sunucu çalıştırın, örneğin `python3 -m http.server`, ve `http://localhost:8000/index.html?file=…` adresini açın. GitHub Pages'teki barındırılan sürüm olduğu gibi çalışır.
+
 ### Dosya biçimi
 
 ```csv

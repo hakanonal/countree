@@ -200,6 +200,27 @@ Click **Save CSV**. The browser downloads `countree_points.csv` containing all p
 
 Click **Load CSV** and select a file. If data is already open you are asked to confirm, because loading **replaces** all current points and areas. Large files load in chunks so the browser stays responsive. When done, the map fits to the loaded data and a message reports the number of points and groups.
 
+### Open a file and settings from the URL
+
+Every setting can also be given in the address bar as a query string, so a link can open Countree already loaded and configured:
+
+```
+index.html?file=data/trees.csv&provider=esri&group=North%20orchard&stats=1
+```
+
+| Parameter | Value | Effect |
+|---|---|---|
+| `file` | Path **relative to `index.html`**, e.g. `data/trees.csv` | Loads that CSV at startup (replaces current data, no confirmation). Absolute paths, URLs (`http://…`), paths starting with `/` and paths containing `..` are rejected. |
+| `provider` | `google_unofficial`, `esri`, `mapbox`, `google`, `here` | Selects the satellite provider. Providers that need a key still read it from `config.js`. |
+| `mode` | `pan`, `add`, `area` | Starts in Pan Mode, Add Mode or Draw Area. |
+| `group` | Exact group name | Filters to that group and zooms to it (applied after `file` loads). |
+| `close` | Distance in metres, 0.1–20 | Turns on the Close-points filter with that distance. |
+| `stats` | `1` or `true` | Turns on the Stats view. |
+| `fit` | `1` or `true` | Turns on *Fit stats inside parcels*. |
+| `lat`, `lng`, `zoom` | Numbers | Sets the map view. Applied last, so it overrides the automatic fit after loading a file. |
+
+Remember to URL-encode values (a space is `%20`). Fetching `file` needs the app to be served over http(s); browsers block this when `index.html` is opened directly from disk (`file://`). Run a static server in the project folder, for example `python3 -m http.server`, and open `http://localhost:8000/index.html?file=…`. The hosted GitHub Pages version works as is.
+
 ### File format
 
 ```csv

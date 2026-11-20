@@ -1055,41 +1055,43 @@ fileInput.addEventListener('change', () => {
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = async (e) => {
-    const text = e.target.result;
-    const result = parseCSV(text);
-
-    if (result.error) {
-      showToast(`Error: ${result.error}`);
-      return;
-    }
-    if (result.rows.length === 0 && result.groups.length === 0) {
-      showToast('CSV file contains no points.');
-      return;
-    }
-
-    // clear existing
-    markerCluster.clearLayers();
-    points = [];
-    nextId = 1;
-    stopEdit();
-    groups.forEach(g => map.removeLayer(g.layer));
-    groups = [];
-    nextGroupId = 1;
-    selectedGroupId = null;
-
-    result.groups.forEach(g => addGroup({ id: nextGroupId++, ...g }));
-    await addPointsInChunks(result.rows);
-    groupsChanged();
-
-    // fit map to loaded points and areas
-    const latlngs = [...points.map(p => [p.lat, p.lng]), ...groups.flatMap(g => g.vertices)];
-    map.fitBounds(L.latLngBounds(latlngs).pad(0.2));
-
-    showToast(`Loaded ${points.length} point${points.length !== 1 ? 's' : ''}, ${groups.length} group${groups.length !== 1 ? 's' : ''}.`);
-  };
+  reader.onload = (e) => loadCSVText(e.target.result);
   reader.readAsText(file);
 });
+
+async function loadCSVText(text) {
+  const result = parseCSV(text);
+
+  if (result.error) {
+    showToast(`Error: ${result.error}`);
+    return false;
+  }
+  if (result.rows.length === 0 && result.groups.length === 0) {
+    showToast('CSV file contains no points.');
+    return false;
+  }
+
+  // clear existing
+  markerCluster.clearLayers();
+  points = [];
+  nextId = 1;
+  stopEdit();
+  groups.forEach(g => map.removeLayer(g.layer));
+  groups = [];
+  nextGroupId = 1;
+  selectedGroupId = null;
+
+  result.groups.forEach(g => addGroup({ id: nextGroupId++, ...g }));
+  await addPointsInChunks(result.rows);
+  groupsChanged();
+
+  // fit map to loaded points and areas
+  const latlngs = [...points.map(p => [p.lat, p.lng]), ...groups.flatMap(g => g.vertices)];
+  map.fitBounds(L.latLngBounds(latlngs).pad(0.2));
+
+  showToast(`Loaded ${points.length} point${points.length !== 1 ? 's' : ''}, ${groups.length} group${groups.length !== 1 ? 's' : ''}.`);
+  return true;
+}
 
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/);
@@ -1168,5 +1170,74 @@ function escHtml(str) {
 }
 
 
+// ── Query-string parameters ───────────────────────────────────────────────────
+// ?file=data/x.csv&provider=esri&mode=add&group=Name&close=1.5&stats=1&fit=1&lat=41&lng=29&zoom=15
+// `file` must be a plain path relative to index.html.
+function isRelativePath(p) {
+  return p !== '' && !/^[a-z][a-z0-9+.-]*:/i.test(p) && !/^[\\/]/.test(p)
+    && !p.split(/[\\/]/).includes('..');
+}
+
+async function applyQueryParams() {
+  const q = new URLSearchParams(location.search);
+  const flag = (name) => ['1', 'true'].includes((q.get(name) || '').toLowerCase());
+
+  const provider = q.get('provider');
+  if (provider) {
+    const cfg = PROVIDERS[provider];
+    const key = cfg && keyForProvider(provider);
+    if (!cfg) showToast(`Unknown provider: ${provider}`);
+    else if (cfg.needsKey && !key) showToast(`Add your key to config.js → ${cfg.keyHint || provider}`);
+    else {
+      providerSelect.value = provider;
+      updateProviderUI(provider);
+      applyProvider(provider, key);
+    }
+  }
+
+  const file = q.get('file');
+  if (file) {
+    if (!isRelativePath(file)) showToast('Error: file must be a path relative to index.html.');
+    else {
+      try {
+        const res = await fetch(file);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        await loadCSVText(await res.text());
+      } catch (err) {
+        showToast(`Error: could not load ${file} (${err.message}). Is the app served over http?`);
+      }
+    }
+  }
+
+  const groupName = q.get('group');
+  if (groupName) {
+    const g = groups.find(gr => gr.name === groupName);
+    if (g) selectGroup(g.id);
+    else showToast(`Group not found: ${groupName}`);
+  }
+
+  const close = parseFloat(q.get('close'));
+  if (!isNaN(close)) {
+    dupDistance.value = Math.min(Math.max(close, dupDistance.min), dupDistance.max);
+    dupDistance.dispatchEvent(new Event('input'));
+    dupEnable.checked = true;
+    dupEnable.dispatchEvent(new Event('change'));
+  }
+
+  if (flag('fit')) statsFit.checked = true;
+  if (flag('stats')) {
+    statsEnable.checked = true;
+    statsEnable.dispatchEvent(new Event('change'));
+  }
+
+  const mode = q.get('mode');
+  if (['pan', 'add', 'area'].includes(mode)) setTool(mode);
+
+  const lat = parseFloat(q.get('lat')), lng = parseFloat(q.get('lng')), zoom = parseInt(q.get('zoom'), 10);
+  if (!isNaN(lat) && !isNaN(lng)) map.setView([lat, lng], isNaN(zoom) ? map.getZoom() : zoom);
+  else if (!isNaN(zoom)) map.setZoom(zoom);
+}
+
 // ── Initial render ────────────────────────────────────────────────────────────
 renderTable();
+applyQueryParams();

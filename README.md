@@ -50,6 +50,26 @@ window.COUNTREE_CONFIG = {
 
 `config.js` is gitignored — your keys stay local.
 
+### URL parameters
+
+Everything can be set from the query string, including the CSV to load (a path **relative to `index.html`**; absolute paths, URLs and `..` are rejected):
+
+```
+index.html?file=data/trees.csv&provider=esri&mode=pan&group=North%20orchard&close=1.5&stats=1&fit=1&lat=41.01&lng=28.97&zoom=17
+```
+
+| Parameter | Value |
+|---|---|
+| `file` | CSV path relative to `index.html` |
+| `provider` | `google_unofficial`, `esri`, `mapbox`, `google`, `here` |
+| `mode` | `pan`, `add`, `area` |
+| `group` | exact group name to filter on |
+| `close` | Close-points distance in metres (0.1–20) |
+| `stats`, `fit` | `1` to enable Stats view / Fit stats inside parcels |
+| `lat`, `lng`, `zoom` | map view (overrides the auto-fit after loading `file`) |
+
+Loading `file` needs http(s) (e.g. `python3 -m http.server`); browsers block it on `file://`.
+
 ## File Structure
 
 ```
@@ -86,7 +106,7 @@ group,"North orchard",,,"41.02 28.97;41.02 28.98;41.01 28.98;41.01 28.97"
 - Group membership is not stored: it is computed from the polygon, so reshaping an area or adding points inside it updates assignments automatically.
 - Legacy 3-column files (`description,latitude,longitude`) still load.
 
-Import replaces all current points and groups after a confirmation prompt.
+Import replaces all current points and groups after a confirmation prompt (not when loaded via the `file` URL parameter).
 
 ## Tech Stack
 
